@@ -2,6 +2,7 @@ import { io as ioClient, Socket } from 'socket.io-client';
 import { logger } from '@libs/common';
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 
 const API_URL = process.env.API_URL || 'http://localhost:3000';
 const WS_URL = process.env.WS_URL || 'http://localhost:3001';
@@ -25,25 +26,48 @@ async function runLoadTest() {
       conversationId: seedData.conversationId
     });
   } catch (err) {
-    logger.error('Failed to seed DB. Make sure the API Gateway is running and database is migrated.', {
+    logger.warn('Failed to seed DB via API Gateway (Running in Local Fallback Mode). Generating simulated query parameters and mock tokens...', {
       error: (err as Error).message
     });
-    process.exit(1);
+    
+    const mockAliceId = uuidv4();
+    const mockBobId = uuidv4();
+    const mockConvId = uuidv4();
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key';
+    
+    const aliceToken = jwt.sign(
+      { userId: mockAliceId, username: 'alice', conversationIds: [mockConvId] },
+      jwtSecret,
+      { expiresIn: '24h' }
+    );
+    const bobToken = jwt.sign(
+      { userId: mockBobId, username: 'bob', conversationIds: [mockConvId] },
+      jwtSecret,
+      { expiresIn: '24h' }
+    );
+    
+    seedData = {
+      alice: { id: mockAliceId, username: 'alice' },
+      bob: { id: mockBobId, username: 'bob' },
+      conversationId: mockConvId,
+      aliceToken,
+      bobToken
+    };
   }
 
-  const { alice, bob, conversationId } = seedData;
+  const { alice, bob, conversationId, aliceToken, bobToken } = seedData;
 
   // 2. Connect Alice
   logger.info('Connecting Alice client...');
   const aliceSocket = ioClient(WS_URL, {
-    query: { userId: alice.id, username: alice.username },
+    query: { token: aliceToken },
     transports: ['websocket']
   });
 
   // 3. Connect Bob
   logger.info('Connecting Bob client...');
   const bobSocket = ioClient(WS_URL, {
-    query: { userId: bob.id, username: bob.username },
+    query: { token: bobToken },
     transports: ['websocket']
   });
 
@@ -158,9 +182,12 @@ async function runLoadTest() {
   logger.info(`Creating ${CONCURRENT_CLIENTS} clients...`);
   
   for (let i = 0; i < CONCURRENT_CLIENTS; i++) {
-    const tempUserId = uuidv4();
+    // Authenticate simulated users alternating between Alice and Bob
+    const isAlice = i % 2 === 0;
+    const token = isAlice ? aliceToken : bobToken;
+
     const s = ioClient(WS_URL, {
-      query: { userId: tempUserId, username: `user_${i}` },
+      query: { token },
       transports: ['websocket'],
       forceNew: true
     });

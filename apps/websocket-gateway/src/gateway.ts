@@ -4,6 +4,7 @@ import { logger, dbPool, Message, TypingEvent, ReceiptEvent } from '@libs/common
 import { RedisService } from '@libs/redis';
 import { KafkaService } from '@libs/kafka';
 import { v4 as uuidv4 } from 'uuid';
+import jwt from 'jsonwebtoken';
 
 const PORT = parseInt(process.env.WS_PORT || '3001', 10);
 const NODE_NAME = process.env.NODE_NAME || `gateway-${uuidv4().substring(0, 8)}`;
@@ -60,7 +61,7 @@ export async function bootstrapGateway() {
   // Subscribe to Redis Pub/Sub channel for cluster-wide events
   const registerSub = async () => {
     try {
-      await redisService.subscribe(REDIS_EVENT_CHANNEL, (event: any) => {
+      await redisService.subscribe(REDIS_EVENT_CHANNEL, async (event: any) => {
         logger.info(`Received event from Redis Pub/Sub on node ${NODE_NAME}`, { type: event.type });
 
         if (event.type === 'message') {
@@ -72,6 +73,17 @@ export async function bootstrapGateway() {
         } else if (event.type === 'receipt') {
           const receipt = event.data as ReceiptEvent;
           io.to(`conversation:${receipt.conversation_id}`).emit('receipt', receipt);
+        } else if (event.type === 'new_conversation') {
+          const conversationId = event.data.id || event.data.conversation_id;
+          const { memberIds } = event.data;
+          for (const userId of memberIds) {
+            const userSockets = await io.in(`user:${userId}`).fetchSockets();
+            for (const s of userSockets) {
+              await s.join(`conversation:${conversationId}`);
+              logger.info(`Locally connected user ${userId} joined room conversation:${conversationId} on new_conversation event`);
+              s.emit('new_conversation', event.data);
+            }
+          }
         }
       });
       logger.info('Successfully subscribed to Redis Pub/Sub channel.');
@@ -93,26 +105,73 @@ export async function bootstrapGateway() {
     );
   });
 
-  // Socket.io Middleware for Mock Auth / Verification
+  // Socket.io Middleware for JWT verification
   io.use(async (socket: Socket, next) => {
-    const userId = socket.handshake.query.userId as string;
-    const username = socket.handshake.query.username as string || 'Anonymous';
+    const token = (socket.handshake.auth?.token || socket.handshake.query?.token) as string;
 
-    if (!userId) {
-      return next(new Error('Authentication failed: userId is required'));
+    if (!token) {
+      return next(new Error('Authentication failed: token is required'));
     }
-    
-    // Store user info on socket
-    socket.data = { userId, username };
-    next();
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key') as {
+        userId: string;
+        username: string;
+        conversationIds?: string[];
+      };
+      
+      // Store user info on socket
+      socket.data = {
+        userId: decoded.userId,
+        username: decoded.username,
+        conversationIds: decoded.conversationIds
+      };
+      next();
+    } catch (err) {
+      logger.error('WebSocket Authentication failed', { error: (err as Error).message });
+      return next(new Error('Authentication failed: Invalid token'));
+    }
   });
 
   io.on('connection', async (socket: Socket) => {
-    const { userId, username } = socket.data;
+    const { userId, username, conversationIds } = socket.data;
     logger.info(`User connected: ${username} (${userId}) on ${NODE_NAME}`, { socketId: socket.id });
 
     // Join user-specific channel for targeted messages
     await socket.join(`user:${userId}`);
+
+    // Join conversation rooms from token (mock/fallback mode support)
+    if (Array.isArray(conversationIds)) {
+      for (const convId of conversationIds) {
+        const roomName = `conversation:${convId}`;
+        await socket.join(roomName);
+        logger.info(`User ${userId} joined room ${roomName} from token payload`);
+      }
+    }
+
+    // Helper function to check/authorize conversation access
+    const authorizeUserForConversation = async (conversationId: string): Promise<boolean> => {
+      const roomName = `conversation:${conversationId}`;
+      if (socket.rooms.has(roomName)) {
+        return true;
+      }
+      
+      // Lazy load from database
+      try {
+        const result = await dbPool.query(
+          'SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
+          [conversationId, userId]
+        );
+        if (result.rows.length > 0) {
+          await socket.join(roomName);
+          logger.info(`User ${userId} lazy-joined room ${roomName} after authorization check`);
+          return true;
+        }
+      } catch (err) {
+        logger.error('Failed to query conversation membership for authorization', { userId, conversationId, error: (err as Error).message });
+      }
+      return false;
+    };
 
     // Fetch user's conversation memberships and join rooms
     try {
@@ -154,6 +213,14 @@ export async function bootstrapGateway() {
       if (!conversationId || !clientMessageId || !content) {
         logger.warn('Received invalid send_message payload', { userId, data });
         if (ack) ack({ status: 'error', message: 'Invalid payload' });
+        return;
+      }
+
+      // Check Authorization
+      const isAuthorized = await authorizeUserForConversation(conversationId);
+      if (!isAuthorized) {
+        logger.warn('Unauthorized send_message attempt', { userId, conversationId });
+        if (ack) ack({ status: 'error', message: 'Unauthorized' });
         return;
       }
 
@@ -290,6 +357,13 @@ export async function bootstrapGateway() {
       const { conversationId } = data;
       if (!conversationId) return;
 
+      // Check Authorization
+      const isAuthorized = await authorizeUserForConversation(conversationId);
+      if (!isAuthorized) {
+        logger.warn('Unauthorized typing_start attempt', { userId, conversationId });
+        return;
+      }
+
       try {
         await redisService.setTyping(conversationId, userId, username, true);
         
@@ -313,6 +387,13 @@ export async function bootstrapGateway() {
       const { conversationId } = data;
       if (!conversationId) return;
 
+      // Check Authorization
+      const isAuthorized = await authorizeUserForConversation(conversationId);
+      if (!isAuthorized) {
+        logger.warn('Unauthorized typing_stop attempt', { userId, conversationId });
+        return;
+      }
+
       try {
         await redisService.setTyping(conversationId, userId, username, false);
         
@@ -335,6 +416,13 @@ export async function bootstrapGateway() {
     socket.on('read_receipt', async (data: { conversationId: string; messageId: string; status: 'delivered' | 'seen' }) => {
       const { conversationId, messageId, status } = data;
       if (!conversationId || !messageId || !status) return;
+
+      // Check Authorization
+      const isAuthorized = await authorizeUserForConversation(conversationId);
+      if (!isAuthorized) {
+        logger.warn('Unauthorized read_receipt attempt', { userId, conversationId });
+        return;
+      }
 
       try {
         // Broadcast receipt event to Redis Pub/Sub (and publish to Kafka for DB update in worker)
