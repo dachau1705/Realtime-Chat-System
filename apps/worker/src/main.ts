@@ -19,117 +19,136 @@ async function bootstrap() {
     async (batchPayload: EachBatchPayload) => {
       const { batch } = batchPayload;
 
-      // Connect to DB and process batch in transactions per message for isolation
-      const client = await dbPool.connect();
+      // Group messages by conversation_id to process them concurrently across conversations
+      // but sequentially within the same conversation to preserve sequence order.
+      const groups = new Map<string, any[]>();
+      for (const record of batch.messages) {
+        if (!record.value) continue;
+        const msg = JSON.parse(record.value.toString());
+        let list = groups.get(msg.conversation_id);
+        if (!list) {
+          list = [];
+          groups.set(msg.conversation_id, list);
+        }
+        list.push(msg);
+      }
+
       try {
-        for (const record of batch.messages) {
-          if (!record.value) continue;
-          const msg = JSON.parse(record.value.toString());
-          
-          logger.info('Worker processing message', { id: msg.id, client_message_id: msg.client_message_id });
+        await Promise.all(
+          Array.from(groups.entries()).map(async ([conversationId, messages]) => {
+            const client = await dbPool.connect();
+            try {
+              for (const msg of messages) {
+                logger.info('Worker processing message (parallel group path)', { 
+                  id: msg.id, 
+                  conversation_id: conversationId,
+                  client_message_id: msg.client_message_id 
+                });
 
-          // Start a transaction for this message
-          await client.query('BEGIN');
-          try {
-            // 1. Insert message
-            const insertMsgQuery = `
-              INSERT INTO messages (id, conversation_id, sender_id, content, client_message_id, created_at)
-              VALUES ($1, $2, $3, $4, $5, $6)
-              ON CONFLICT (client_message_id) DO NOTHING
-              RETURNING id;
-            `;
-            const res = await client.query(insertMsgQuery, [
-              msg.id,
-              msg.conversation_id,
-              msg.sender_id,
-              msg.content,
-              msg.client_message_id,
-              msg.created_at
-            ]);
+                await client.query('BEGIN');
+                try {
+                  // 1. Insert message
+                  const insertMsgQuery = `
+                    INSERT INTO messages (id, conversation_id, sender_id, content, client_message_id, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    ON CONFLICT (client_message_id) DO NOTHING
+                    RETURNING id;
+                  `;
+                  const res = await client.query(insertMsgQuery, [
+                    msg.id,
+                    msg.conversation_id,
+                    msg.sender_id,
+                    msg.content,
+                    msg.client_message_id,
+                    msg.created_at
+                  ]);
 
-            const messageWasInserted = res.rowCount && res.rowCount > 0;
-            
-            if (messageWasInserted) {
-              // 2. Fetch conversation members to create receipts
-              const membersRes = await client.query(
-                'SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND user_id != $2',
-                [msg.conversation_id, msg.sender_id]
-              );
+                  const messageWasInserted = res.rowCount && res.rowCount > 0;
+                  
+                  if (messageWasInserted) {
+                    // 2. Fetch conversation members to create receipts
+                    const membersRes = await client.query(
+                      'SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND user_id != $2',
+                      [msg.conversation_id, msg.sender_id]
+                    );
 
-              // 3. Create default receipts ('sent'/'delivered') for other members
-              for (const memberRow of membersRes.rows) {
-                const recipientId = memberRow.user_id;
-                
-                // Let's check if recipient is online in Redis to optimize receipt delivery
-                const presence = await redisService.getUserPresence(recipientId);
-                const status = presence?.status === 'online' ? 'delivered' : 'sent';
+                    // 3. Create default receipts ('sent'/'delivered') for other members
+                    for (const memberRow of membersRes.rows) {
+                      const recipientId = memberRow.user_id;
+                      
+                      // Let's check if recipient is online in Redis to optimize receipt delivery
+                      const presence = await redisService.getUserPresence(recipientId);
+                      const status = presence?.status === 'online' ? 'delivered' : 'sent';
 
-                await client.query(
-                  `INSERT INTO message_receipts (message_id, user_id, status, updated_at)
-                   VALUES ($1, $2, $3, NOW())
-                   ON CONFLICT (message_id, user_id) DO NOTHING`,
-                  [msg.id, recipientId, status]
-                );
+                      await client.query(
+                        `INSERT INTO message_receipts (message_id, user_id, status, updated_at)
+                         VALUES ($1, $2, $3, NOW())
+                         ON CONFLICT (message_id, user_id) DO NOTHING`,
+                        [msg.id, recipientId, status]
+                      );
 
-                // If recipient is online, notify them via Redis Pub/Sub immediately about receipt status change
-                if (status === 'delivered') {
-                  await redisService.publish('chat:events', {
-                    type: 'receipt',
-                    data: {
-                      conversation_id: msg.conversation_id,
-                      message_id: msg.id,
-                      user_id: recipientId,
-                      status: 'delivered'
+                      // If recipient is online, notify them via Redis Pub/Sub immediately about receipt status change
+                      if (status === 'delivered') {
+                        await redisService.publish('chat:events', {
+                          type: 'receipt',
+                          data: {
+                            conversation_id: msg.conversation_id,
+                            message_id: msg.id,
+                            user_id: recipientId,
+                            status: 'delivered'
+                          }
+                        });
+                      }
                     }
-                  });
+
+                    // 4. Publish real-time message event to Redis Pub/Sub
+                    await redisService.publish('chat:events', {
+                      type: 'message',
+                      data: msg
+                    });
+                  }
+                  await client.query('COMMIT');
+                } catch (msgErr) {
+                  await client.query('ROLLBACK');
+                  const pgErr = msgErr as any;
+                  
+                  // Check if this is a permanent data integrity violation (class 23)
+                  const isDataValidationError = pgErr.code && pgErr.code.startsWith('23');
+                  
+                  if (isDataValidationError) {
+                    logger.error('Validation error processing message (Skipping message and routing to DLQ)', {
+                      id: msg.id,
+                      code: pgErr.code,
+                      detail: pgErr.detail,
+                      message: pgErr.message
+                    });
+                    
+                    // Route this message to DLQ topic manually
+                    try {
+                      await kafkaService.publishMessage('chat.messages.dlq', msg.conversation_id, {
+                        ...msg,
+                        x_error_code: pgErr.code,
+                        x_error_detail: pgErr.detail,
+                        x_error_message: pgErr.message,
+                        failed_at: new Date()
+                      });
+                    } catch (dlqErr) {
+                      logger.error('Failed to publish invalid message to DLQ topic', { error: (dlqErr as Error).message });
+                    }
+                  } else {
+                    // Re-throw transient infrastructure errors to retry the batch
+                    throw msgErr;
+                  }
                 }
               }
-
-              // 4. Publish real-time message event to Redis Pub/Sub
-              await redisService.publish('chat:events', {
-                type: 'message',
-                data: msg
-              });
+            } finally {
+              client.release();
             }
-            await client.query('COMMIT');
-          } catch (msgErr) {
-            await client.query('ROLLBACK');
-            const pgErr = msgErr as any;
-            
-            // Check if this is a permanent data integrity violation (class 23)
-            const isDataValidationError = pgErr.code && pgErr.code.startsWith('23');
-            
-            if (isDataValidationError) {
-              logger.error('Validation error processing message (Skipping message and routing to DLQ)', {
-                id: msg.id,
-                code: pgErr.code,
-                detail: pgErr.detail,
-                message: pgErr.message
-              });
-              
-              // Route this message to DLQ topic manually
-              try {
-                await kafkaService.publishMessage('chat.messages.dlq', msg.conversation_id, {
-                  ...msg,
-                  x_error_code: pgErr.code,
-                  x_error_detail: pgErr.detail,
-                  x_error_message: pgErr.message,
-                  failed_at: new Date()
-                });
-              } catch (dlqErr) {
-                logger.error('Failed to publish invalid message to DLQ topic', { error: (dlqErr as Error).message });
-              }
-            } else {
-              // Re-throw transient infrastructure errors to retry the batch
-              throw msgErr;
-            }
-          }
-        }
+          })
+        );
       } catch (batchErr) {
         logger.error('Failed to process message batch (retrying...)', { error: (batchErr as Error).message });
         throw batchErr;
-      } finally {
-        client.release();
       }
     }
   );

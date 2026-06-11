@@ -14,9 +14,55 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 
 const redisService = new RedisService();
 
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex');
+function hashPassword(password: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const salt = crypto.randomBytes(16).toString('hex');
+    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
+      if (err) return reject(err);
+      resolve(`${salt}:${derivedKey.toString('hex')}`);
+    });
+  });
 }
+
+function comparePassword(password: string, hash: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const parts = hash.split(':');
+    if (parts.length !== 2) {
+      // Fallback for legacy sha256 hashes if any exist
+      const fallbackHash = crypto.createHash('sha256').update(password).digest('hex');
+      return resolve(hash === fallbackHash);
+    }
+    const [salt, key] = parts;
+    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
+      if (err) return reject(err);
+      resolve(key === derivedKey.toString('hex'));
+    });
+  });
+}
+
+function createRateLimiter(redisService: RedisService, limit: number, windowSeconds: number) {
+  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown-ip';
+    const key = `ratelimit:${ip}`;
+    try {
+      const client = redisService.getClient();
+      const current = await client.incr(key);
+      if (current === 1) {
+        await client.expire(key, windowSeconds);
+      }
+      if (current > limit) {
+        logger.warn('Rate limit exceeded', { ip, limit, current });
+        return res.status(429).json({ error: 'Too many requests, please try again later.' });
+      }
+      next();
+    } catch (err) {
+      logger.warn('Rate limiter Redis error, failing open', { error: (err as Error).message });
+      next();
+    }
+  };
+}
+
+const authLimiter = createRateLimiter(redisService, 15, 60);
 
 export interface AuthenticatedRequest extends express.Request {
   user?: {
@@ -43,14 +89,14 @@ export function authenticateToken(req: AuthenticatedRequest, res: express.Respon
 }
 
 // 1. User Registration (Public)
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', authLimiter, async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password) {
     return res.status(400).json({ error: 'Missing username, email, or password' });
   }
 
   try {
-    const passwordHash = hashPassword(password);
+    const passwordHash = await hashPassword(password);
     const result = await dbPool.query(
       `INSERT INTO users (username, email, password_hash)
        VALUES ($1, $2, $3)
@@ -73,14 +119,13 @@ app.post('/api/users', async (req, res) => {
 });
 
 // 2. User Login (Public)
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Missing username or password' });
   }
 
   try {
-    const passwordHash = hashPassword(password);
     const result = await dbPool.query(
       'SELECT id, username, email, password_hash FROM users WHERE username = $1',
       [username]
@@ -91,7 +136,8 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = result.rows[0];
-    if (user.password_hash !== passwordHash) {
+    const isPasswordValid = await comparePassword(password, user.password_hash);
+    if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
@@ -241,6 +287,7 @@ app.get('/api/conversations/:id/messages', authenticateToken, async (req: Authen
   const currentUserId = req.user!.userId;
   const limit = parseInt(req.query.limit as string || '50', 10);
   const before = req.query.before as string;
+  const beforeId = req.query.beforeId as string;
 
   try {
     // Authorization check: Verify that the current user is a member of the conversation
@@ -261,12 +308,15 @@ app.get('/api/conversations/:id/messages', authenticateToken, async (req: Authen
     `;
     const params: any[] = [conversationId];
 
-    if (before) {
+    if (before && beforeId) {
+      query += ` AND (m.created_at < $2 OR (m.created_at = $2 AND m.id < $3))`;
+      params.push(new Date(before), beforeId);
+    } else if (before) {
       query += ` AND m.created_at < $2`;
       params.push(new Date(before));
     }
 
-    query += ` ORDER BY m.created_at DESC LIMIT $${params.length + 1}`;
+    query += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${params.length + 1}`;
     params.push(limit);
 
     const result = await dbPool.query(query, params);
@@ -285,12 +335,14 @@ app.post('/api/seed', async (req, res) => {
   try {
     await client.query('BEGIN');
     
+    const hashedPassword = await hashPassword('password');
+    
     const user1Res = await client.query(
       `INSERT INTO users (username, email, password_hash)
        VALUES ('alice', 'alice@example.com', $1)
        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
        RETURNING id, username`,
-      [hashPassword('password')]
+      [hashedPassword]
     );
     const alice = user1Res.rows[0];
 
@@ -299,7 +351,7 @@ app.post('/api/seed', async (req, res) => {
        VALUES ('bob', 'bob@example.com', $1)
        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
        RETURNING id, username`,
-      [hashPassword('password')]
+      [hashedPassword]
     );
     const bob = user2Res.rows[0];
 
