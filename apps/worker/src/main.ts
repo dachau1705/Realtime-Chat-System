@@ -10,7 +10,7 @@ async function bootstrap() {
   const redisService = new RedisService();
 
   // Ensure required Kafka topics exist before subscribing consumers
-  await kafkaService.ensureTopics(['chat.messages', 'chat.receipts']);
+  await kafkaService.ensureTopics(['chat.messages', 'chat.receipts', 'social.notifications']);
 
   // Topic 1: chat.messages Consumer
   await kafkaService.startConsumer(
@@ -49,8 +49,8 @@ async function bootstrap() {
                 try {
                   // 1. Insert message
                   const insertMsgQuery = `
-                    INSERT INTO messages (id, conversation_id, sender_id, content, client_message_id, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6)
+                    INSERT INTO messages (id, conversation_id, sender_id, content, client_message_id, type, media_url, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                     ON CONFLICT (client_message_id) DO NOTHING
                     RETURNING id;
                   `;
@@ -60,6 +60,8 @@ async function bootstrap() {
                     msg.sender_id,
                     msg.content,
                     msg.client_message_id,
+                    msg.type || 'text',
+                    msg.media_url || null,
                     msg.created_at
                   ]);
 
@@ -200,6 +202,65 @@ async function bootstrap() {
       } catch (err) {
         await client.query('ROLLBACK');
         logger.error('Failed to commit receipt batch', { error: (err as Error).message });
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+  );
+
+  // Topic 3: social.notifications Consumer
+  await kafkaService.startConsumer(
+    'social-notifications-worker-group',
+    'social.notifications',
+    async (batchPayload: EachBatchPayload) => {
+      const { batch } = batchPayload;
+      const client = await dbPool.connect();
+      try {
+        await client.query('BEGIN');
+
+        for (const record of batch.messages) {
+          if (!record.value) continue;
+          const notif = JSON.parse(record.value.toString());
+
+          logger.info('Worker processing notification', { id: notif.id, user_id: notif.user_id, type: notif.type });
+
+          // Insert into database
+          await client.query(
+            `INSERT INTO notifications (id, user_id, actor_id, type, post_id, comment_id, is_read, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             ON CONFLICT (id) DO NOTHING`,
+            [
+              notif.id,
+              notif.user_id,
+              notif.actor_id,
+              notif.type,
+              notif.post_id,
+              notif.comment_id,
+              notif.is_read,
+              notif.created_at
+            ]
+          );
+
+          // Fetch actor username and avatar for realtime display
+          const actorRes = await client.query('SELECT username, avatar_url FROM users WHERE id = $1', [notif.actor_id]);
+          const actorInfo = actorRes.rows[0] || {};
+
+          // Publish to Redis Pub/Sub for realtime websocket forwarding
+          await redisService.publish('chat:events', {
+            type: 'notification',
+            data: {
+              ...notif,
+              actor_username: actorInfo.username,
+              actor_avatar_url: actorInfo.avatar_url
+            }
+          });
+        }
+
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        logger.error('Failed to process notification batch', { error: (err as Error).message });
         throw err;
       } finally {
         client.release();

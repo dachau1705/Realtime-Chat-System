@@ -84,6 +84,22 @@ export async function bootstrapGateway() {
               s.emit('new_conversation', event.data);
             }
           }
+        } else if (event.type === 'friend_request') {
+          const { receiverId, senderUsername } = event.data;
+          io.to(`user:${receiverId}`).emit('friend_request', { senderUsername });
+          logger.info(`Forwarded friend_request event to user:${receiverId} for sender ${senderUsername}`);
+        } else if (event.type === 'friend_accept') {
+          const { receiverId, senderUsername } = event.data;
+          io.to(`user:${receiverId}`).emit('friend_accepted', { senderUsername });
+          logger.info(`Forwarded friend_accept event to user:${receiverId} for sender ${senderUsername}`);
+        } else if (event.type === 'profile_update') {
+          const { userId, username, fullName, avatarUrl } = event.data;
+          io.emit('profile_updated', { userId, username, fullName, avatarUrl });
+          logger.info(`Broadcasted profile_update event for user ${userId}`);
+        } else if (event.type === 'notification') {
+          const notif = event.data;
+          io.to(`user:${notif.user_id}`).emit('notification', notif);
+          logger.info(`Forwarded notification of type ${notif.type} to user:${notif.user_id}`);
         }
       });
       logger.info('Successfully subscribed to Redis Pub/Sub channel.');
@@ -207,10 +223,12 @@ export async function bootstrapGateway() {
     // Handle Client Events
 
     // 1. Messaging Event
-    socket.on('send_message', async (data: { conversationId: string; clientMessageId: string; content: string }, ack) => {
-      const { conversationId, clientMessageId, content } = data;
+    socket.on('send_message', async (data: { conversationId: string; clientMessageId: string; content: string; type?: 'text' | 'image' | 'sticker'; mediaUrl?: string }, ack) => {
+      const { conversationId, clientMessageId, content, type = 'text', mediaUrl } = data;
       
-      if (!conversationId || !clientMessageId || !content) {
+      const messageContent = content || (type === 'image' ? '[Image]' : type === 'sticker' ? '[Sticker]' : '');
+      
+      if (!conversationId || !clientMessageId || !messageContent) {
         logger.warn('Received invalid send_message payload', { userId, data });
         if (ack) ack({ status: 'error', message: 'Invalid payload' });
         return;
@@ -256,8 +274,10 @@ export async function bootstrapGateway() {
           id: serverMessageId,
           conversation_id: conversationId,
           sender_id: userId,
-          content,
+          content: messageContent,
           client_message_id: clientMessageId,
+          type,
+          media_url: mediaUrl || null,
           created_at: new Date()
         };
 
@@ -284,10 +304,10 @@ export async function bootstrapGateway() {
             
             // Insert message
             await dbClient.query(
-              `INSERT INTO messages (id, conversation_id, sender_id, content, client_message_id, created_at)
-               VALUES ($1, $2, $3, $4, $5, $6)
+              `INSERT INTO messages (id, conversation_id, sender_id, content, client_message_id, type, media_url, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                ON CONFLICT (client_message_id) DO NOTHING`,
-              [msgPayload.id, msgPayload.conversation_id, msgPayload.sender_id, msgPayload.content, msgPayload.client_message_id, msgPayload.created_at]
+              [msgPayload.id, msgPayload.conversation_id, msgPayload.sender_id, msgPayload.content, msgPayload.client_message_id, msgPayload.type, msgPayload.media_url, msgPayload.created_at]
             );
 
             // Fetch other conversation members

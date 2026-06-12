@@ -15,5 +15,5 @@
       "@libs/kafka": ["libs/kafka/src/index.ts"]
     }
   },
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "apps/frontend"]
 }

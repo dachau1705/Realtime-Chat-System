@@ -46,6 +46,12 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  full_name?: string | null;
+  phone?: string | null;
+  avatar_url?: string | null;
+  cover_url?: string | null;
+  bio?: string | null;
+  privacy_is_public?: boolean;
   created_at: Date;
 }
 
@@ -63,6 +69,8 @@ export interface Message {
   sender_id: string;
   content: string;
   client_message_id: string;
+  type: 'text' | 'image' | 'sticker';
+  media_url?: string;
   created_at: Date;
 }
 
