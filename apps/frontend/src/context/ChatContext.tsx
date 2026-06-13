@@ -265,6 +265,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     socketInstance.on('profile_updated', (data: { userId: string; username: string; fullName: string | null; avatarUrl: string | null }) => {
       logEvent('incoming', 'PROFILE_UPDATED_RECEIVED', data);
 
+      if (currentUserRef.current && currentUserRef.current.id === data.userId) {
+        setCurrentUser(prev => {
+          if (prev) {
+            const updated = { ...prev, username: data.username, full_name: data.fullName, avatar_url: data.avatarUrl };
+            sessionStorage.setItem('chatUser', JSON.stringify(updated));
+            return updated;
+          }
+          return prev;
+        });
+      }
+
       setOtherUser(prev => {
         if (prev && prev.id === data.userId) {
           return { ...prev, username: data.username, full_name: data.fullName, avatar_url: data.avatarUrl };

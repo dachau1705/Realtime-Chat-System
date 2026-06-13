@@ -4,8 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 
-const API_URL = process.env.API_URL || 'http://localhost:3000';
-const WS_URL = process.env.WS_URL || 'http://localhost:3001';
+const API_URL = process.env.API_URL || 'http://localhost:4000';
+const WS_URL = process.env.WS_URL || 'http://localhost:4001';
 
 async function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -29,12 +29,12 @@ async function runLoadTest() {
     logger.warn('Failed to seed DB via API Gateway (Running in Local Fallback Mode). Generating simulated query parameters and mock tokens...', {
       error: (err as Error).message
     });
-    
+
     const mockAliceId = uuidv4();
     const mockBobId = uuidv4();
     const mockConvId = uuidv4();
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key';
-    
+
     const aliceToken = jwt.sign(
       { userId: mockAliceId, username: 'alice', conversationIds: [mockConvId] },
       jwtSecret,
@@ -45,7 +45,7 @@ async function runLoadTest() {
       jwtSecret,
       { expiresIn: '24h' }
     );
-    
+
     seedData = {
       alice: { id: mockAliceId, username: 'alice' },
       bob: { id: mockBobId, username: 'bob' },
@@ -162,7 +162,7 @@ async function runLoadTest() {
 
   logger.info('Reconnecting Bob client...');
   bobSocket.connect();
-  
+
   // Wait to establish and receive sync messages
   await delay(2000);
 
@@ -177,10 +177,10 @@ async function runLoadTest() {
   // --- LOAD TESTING SIMULATION (Optional high concurrency) ---
   const CONCURRENT_CLIENTS = parseInt(process.env.SIMULATE_CONCURRENCY || '100', 10);
   logger.info(`--- SIMULATING ${CONCURRENT_CLIENTS} CONCURRENT USERS ---`);
-  
+
   const sockets: Socket[] = [];
   logger.info(`Creating ${CONCURRENT_CLIENTS} clients...`);
-  
+
   for (let i = 0; i < CONCURRENT_CLIENTS; i++) {
     // Authenticate simulated users alternating between Alice and Bob
     const isAlice = i % 2 === 0;
@@ -191,7 +191,7 @@ async function runLoadTest() {
       transports: ['websocket'],
       forceNew: true
     });
-    
+
     s.on('connect', () => {
       if (i % 10 === 0 || i === CONCURRENT_CLIENTS - 1) {
         logger.info(`Connected client simulation progress: ${i + 1}/${CONCURRENT_CLIENTS}`);

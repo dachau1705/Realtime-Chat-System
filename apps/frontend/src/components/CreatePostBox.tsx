@@ -75,7 +75,11 @@ export function CreatePostBox({ onPostCreated }: CreatePostBoxProps) {
     }}>
       <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
         <div className="avatar" style={{ flexShrink: 0 }}>
-          {currentUser?.username?.charAt(0).toUpperCase() || 'U'}
+          {currentUser?.avatar_url ? (
+            <img src={currentUser.avatar_url} alt="My Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+          ) : (
+            currentUser?.username?.charAt(0).toUpperCase() || 'U'
+          )}
         </div>
         <textarea
           placeholder={`What's on your mind, ${currentUser?.full_name || currentUser?.username || 'friend'}?`}

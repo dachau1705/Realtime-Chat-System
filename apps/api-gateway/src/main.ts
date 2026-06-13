@@ -269,6 +269,10 @@ app.post('/api/upload', authenticateToken, upload.single('file'), async (req: Au
   }
 });
 
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // 1. User Registration (Public)
 app.post('/api/users', authLimiter, async (req, res) => {
   const { username, email, password } = req.body;
@@ -735,7 +739,7 @@ app.get('/api/friends/requests', authenticateToken, async (req: AuthenticatedReq
   const currentUserId = req.user!.userId;
   try {
     const result = await dbPool.query(
-      `SELECT f.user_id_1 as sender_id, u.username as sender_username, u.email as sender_email, f.created_at
+      `SELECT f.user_id_1 as sender_id, u.username as sender_username, u.email as sender_email, u.avatar_url as sender_avatar_url, f.created_at
        FROM friendships f
        JOIN users u ON f.user_id_1 = u.id
        WHERE f.user_id_2 = $1 AND f.status = 'pending'

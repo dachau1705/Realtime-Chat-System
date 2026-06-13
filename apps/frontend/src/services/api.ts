@@ -44,8 +44,8 @@ export interface LogEntry {
  * Checks if the backend API is online.
  */
 export async function checkBackendHealth(): Promise<void> {
-  const response = await fetch('/api/users');
-  if (!response.ok && response.status !== 401) {
+  const response = await fetch('/api/health');
+  if (!response.ok) {
     throw new Error('API down');
   }
 }
@@ -199,6 +199,7 @@ export interface FriendRequest {
   sender_id: string;
   sender_username: string;
   sender_email: string;
+  sender_avatar_url?: string;
   created_at: string;
 }
 

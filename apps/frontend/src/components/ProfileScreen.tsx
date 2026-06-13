@@ -24,7 +24,8 @@ export function ProfileScreen() {
     acceptRequest, 
     declineRequest, 
     startChatWithUser,
-    currentUser
+    currentUser,
+    setCurrentUser
   } = useChat();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -58,6 +59,18 @@ export function ProfileScreen() {
       setError(null);
       const data = await fetchUserProfile(token, id);
       setProfile(data);
+      
+      // Update global currentUser context and session storage if viewing self
+      if (currentUser && data.id === currentUser.id) {
+        const updatedUser = {
+          ...currentUser,
+          username: data.username,
+          full_name: data.full_name,
+          avatar_url: data.avatar_url
+        };
+        setCurrentUser(updatedUser);
+        sessionStorage.setItem('chatUser', JSON.stringify(updatedUser));
+      }
       
       // Initialize edit form
       setFormData({

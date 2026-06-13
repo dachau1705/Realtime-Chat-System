@@ -93,7 +93,11 @@ export function Sidebar() {
         </div>
         <div className="user-selector" onClick={handleProfileClick} title="View your profile">
           <div className="avatar" id="myAvatar">
-            {currentUser?.username?.charAt(0).toUpperCase() || 'U'}
+            {currentUser?.avatar_url ? (
+              <img src={currentUser.avatar_url} alt="My Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              currentUser?.username?.charAt(0).toUpperCase() || 'U'
+            )}
           </div>
           <div className="profile-info">
             <div className="profile-name" id="myName">
@@ -262,7 +266,11 @@ export function Sidebar() {
                     style={{ cursor: c.is_group ? 'default' : 'pointer' }}
                     title={c.is_group ? '' : 'View profile'}
                   >
-                    {displayName.charAt(0).toUpperCase()}
+                    {!c.is_group && c.member_avatar_urls?.[0] ? (
+                      <img src={c.member_avatar_urls[0]} alt={displayName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    ) : (
+                      displayName.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div className="conv-details">
                     <div className="conv-name" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -354,7 +362,11 @@ export function Sidebar() {
                     style={{ cursor: 'pointer' }}
                     title="View profile"
                   >
-                    {u.username.charAt(0).toUpperCase()}
+                    {u.avatar_url ? (
+                      <img src={u.avatar_url} alt={u.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    ) : (
+                      u.username.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div className="conv-details">
                     <div className="conv-name">{u.username}</div>
@@ -386,7 +398,11 @@ export function Sidebar() {
                     style={{ cursor: 'pointer' }}
                     title="View profile"
                   >
-                    {req.sender_username.charAt(0).toUpperCase()}
+                    {req.sender_avatar_url ? (
+                      <img src={req.sender_avatar_url} alt={req.sender_username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    ) : (
+                      req.sender_username.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div className="conv-details" style={{ overflow: 'hidden' }}>
                     <div className="conv-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
