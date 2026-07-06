@@ -1,18 +1,17 @@
 import React, { useState, useRef } from 'react';
-import { useChat } from '../hooks/useChat';
-import { createPost, uploadMedia } from '../services/api';
+import { useChat } from '../../hooks/useChat';
+import { uploadMedia } from '../../services/api';
+import { useCreatePostMutation } from '../../hooks/useFeedQuery';
 
-interface CreatePostBoxProps {
-  onPostCreated: () => void;
-}
-
-export function CreatePostBox({ onPostCreated }: CreatePostBoxProps) {
+export function CreatePostBox() {
   const { token, showToast, currentUser } = useChat();
   const [content, setContent] = useState<string>('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState<boolean>(false);
-  const [submitting, setSubmitting] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Use the React Query optimistic mutation
+  const createPostMutation = useCreatePostMutation(token || '', currentUser);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -48,33 +47,37 @@ export function CreatePostBox({ onPostCreated }: CreatePostBoxProps) {
     if (!token) return;
     if (!content.trim() && imageUrls.length === 0) return;
 
-    setSubmitting(true);
-    try {
-      await createPost(token, content.trim(), imageUrls);
-      setContent('');
-      setImageUrls([]);
-      showToast('Success', 'Post published successfully!', false);
-      onPostCreated();
-    } catch (err: any) {
-      showToast('Publish Failed', err.message || 'Failed to create post', true);
-    } finally {
-      setSubmitting(false);
-    }
+    createPostMutation.mutate(
+      { content: content.trim(), mediaUrls: imageUrls },
+      {
+        onSuccess: () => {
+          setContent('');
+          setImageUrls([]);
+          showToast('Success', 'Post published successfully!', false);
+        },
+        onError: (err: any) => {
+          showToast('Publish Failed', err.message || 'Failed to create post', true);
+        }
+      }
+    );
   };
 
+  const isBtnDisabled = createPostMutation.isPending || uploading || (!content.trim() && imageUrls.length === 0);
+
   return (
-    <div className="create-post-box" style={{
+    <div className="create-post-box-premium" style={{
       background: 'var(--panel-bg)',
       border: '1px solid var(--panel-border)',
       borderRadius: '16px',
       padding: '16px',
-      marginBottom: '20px',
+      marginBottom: '16px',
       display: 'flex',
       flexDirection: 'column',
-      gap: '12px'
+      gap: '12px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
     }}>
       <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-        <div className="avatar" style={{ flexShrink: 0 }}>
+        <div className="avatar" style={{ flexShrink: 0, width: '40px', height: '40px' }}>
           {currentUser?.avatar_url ? (
             <img src={currentUser.avatar_url} alt="My Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
           ) : (
@@ -92,12 +95,13 @@ export function CreatePostBox({ onPostCreated }: CreatePostBoxProps) {
             border: 'none',
             outline: 'none',
             color: 'var(--text-main)',
-            fontSize: '14px',
+            fontSize: '14.5px',
             resize: 'none',
             fontFamily: 'inherit',
-            lineHeight: '1.5'
+            lineHeight: '1.5',
+            paddingTop: '8px'
           }}
-          disabled={submitting}
+          disabled={createPostMutation.isPending}
         />
       </div>
 
@@ -138,6 +142,7 @@ export function CreatePostBox({ onPostCreated }: CreatePostBoxProps) {
         </div>
       )}
 
+      {/* Action Buttons & Submit */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -146,7 +151,9 @@ export function CreatePostBox({ onPostCreated }: CreatePostBoxProps) {
         paddingTop: '12px',
         marginTop: '4px'
       }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        {/* Attachment & Action items */}
+        <div style={{ display: 'flex', gap: '16px' }}>
+          {/* Photo/Video */}
           <input
             type="file"
             multiple
@@ -158,30 +165,96 @@ export function CreatePostBox({ onPostCreated }: CreatePostBoxProps) {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="input-action-btn"
-            title="Attach Photos"
-            disabled={uploading || submitting}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--text-muted)',
+              fontSize: '13px',
+              fontWeight: 600,
+              padding: '6px 8px',
+              borderRadius: '8px',
+              transition: 'background 0.2s'
+            }}
+            className="post-action-btn"
+            disabled={uploading || createPostMutation.isPending}
           >
             {uploading ? (
               <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--primary)' }}></i>
             ) : (
-              <i className="fa-regular fa-image" style={{ color: 'var(--success)' }}></i>
+              <i className="fa-regular fa-image" style={{ color: 'var(--success)', fontSize: '16px' }}></i>
             )}
+            <span>Photo</span>
+          </button>
+
+          {/* Video Mock */}
+          <button
+            type="button"
+            onClick={() => showToast('Feature Info', 'Video posting will be available in future releases', false)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--text-muted)',
+              fontSize: '13px',
+              fontWeight: 600,
+              padding: '6px 8px',
+              borderRadius: '8px',
+              transition: 'background 0.2s'
+            }}
+            className="post-action-btn"
+            disabled={createPostMutation.isPending}
+          >
+            <i className="fa-solid fa-video" style={{ color: '#E42645', fontSize: '15px' }}></i>
+            <span>Video</span>
+          </button>
+
+          {/* Feeling Mock */}
+          <button
+            type="button"
+            onClick={() => showToast('Feature Info', 'Feeling selector will be available in future releases', false)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--text-muted)',
+              fontSize: '13px',
+              fontWeight: 600,
+              padding: '6px 8px',
+              borderRadius: '8px',
+              transition: 'background 0.2s'
+            }}
+            className="post-action-btn"
+            disabled={createPostMutation.isPending}
+          >
+            <i className="fa-regular fa-face-smile" style={{ color: '#EAB026', fontSize: '16px' }}></i>
+            <span>Feeling</span>
           </button>
         </div>
 
+        {/* Post Submit Button */}
         <button
           onClick={handleSubmit}
           className="primary-btn"
           style={{
             width: 'auto',
-            padding: '8px 24px',
+            padding: '8px 20px',
             fontSize: '13px',
-            borderRadius: '10px'
+            borderRadius: '10px',
+            fontWeight: 600
           }}
-          disabled={submitting || uploading || (!content.trim() && imageUrls.length === 0)}
+          disabled={isBtnDisabled}
         >
-          {submitting ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Post'}
+          {createPostMutation.isPending ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Share'}
         </button>
       </div>
     </div>

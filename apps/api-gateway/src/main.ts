@@ -1066,14 +1066,91 @@ app.post('/api/seed', async (req, res) => {
   }
 });
 
-// Helper to invalidate feed cache for user and their friends/followers
-async function invalidateFeedCache(userId: string) {
+// Helper to distribute post to followers (Hybrid Fan-out on Write)
+async function pushPostToFollowers(userId: string, postId: string, timestamp: number, post: any, user: any) {
   try {
     const client = redisService.getClient();
-    // Invalidate user's own feed cache
-    await client.del(`feed:user:${userId}`);
     
-    // Invalidate caches of all users who follow or are friends with this user
+    // 1. Save detailed post cache (JSON format, 24 hour TTL)
+    const postDetails = {
+      ...post,
+      username: user.username,
+      full_name: user.full_name,
+      avatar_url: user.avatar_url,
+      comment_count: 0,
+      reaction_count: 0,
+      has_reacted: false,
+      reaction_type: null
+    };
+    await client.set(`post:${postId}`, JSON.stringify(postDetails), 'EX', 24 * 3600);
+
+    // 2. Add to user's own feed Sorted Set
+    const ownFeedKey = `feed:user:${userId}`;
+    await client.zadd(ownFeedKey, timestamp, postId);
+    await client.zremrangebyrank(ownFeedKey, 0, -501);
+
+    // 3. Get followers and friends list
+    const relationsRes = await dbPool.query(
+      `SELECT follower_id AS user_id FROM follows WHERE following_id = $1
+       UNION
+       SELECT CASE WHEN user_id_1 = $1 THEN user_id_2 ELSE user_id_1 END AS user_id 
+       FROM friendships 
+       WHERE (user_id_1 = $1 OR user_id_2 = $1) AND status = 'accepted'`,
+      [userId]
+    );
+
+    const followersCount = relationsRes.rows.length;
+
+    if (followersCount > 100) {
+      // VIP/Celebrity: Do not push to individual feeds. Save to celebrity posts set.
+      const celebrityKey = `celebrity_posts:${userId}`;
+      await client.zadd(celebrityKey, timestamp, postId);
+      await client.zremrangebyrank(celebrityKey, 0, -101); // Keep last 100
+      await client.expire(celebrityKey, 7 * 24 * 3600); // 7 days TTL
+
+      // Broadcast realtime notification to followers online asynchronously
+      setTimeout(async () => {
+        for (const row of relationsRes.rows) {
+          const followerId = row.user_id;
+          await redisService.publish('chat:events', {
+            type: 'new_feed_item',
+            data: { followerId, post: postDetails }
+          });
+        }
+      }, 0);
+    } else {
+      // Standard User: Fan-out on Write to all active followers' caches
+      for (const row of relationsRes.rows) {
+        const followerId = row.user_id;
+        const key = `feed:user:${followerId}`;
+        
+        // Push only if the cache currently exists in Redis
+        const cacheExists = await client.exists(key);
+        if (cacheExists) {
+          await client.zadd(key, timestamp, postId);
+          await client.zremrangebyrank(key, 0, -501);
+        }
+
+        // Publish realtime notification via Redis Pub/Sub
+        await redisService.publish('chat:events', {
+          type: 'new_feed_item',
+          data: { followerId, post: postDetails }
+        });
+      }
+    }
+  } catch (err) {
+    logger.error('Failed to execute hybrid fan-out for post', { userId, postId, error: (err as Error).message });
+  }
+}
+
+// Helper to remove post from feeds on deletion
+async function removePostFromFeeds(userId: string, postId: string) {
+  try {
+    const client = redisService.getClient();
+    await client.del(`post:${postId}`);
+    await client.zrem(`feed:user:${userId}`, postId);
+    await client.zrem(`celebrity_posts:${userId}`, postId);
+
     const relationsRes = await dbPool.query(
       `SELECT follower_id AS user_id FROM follows WHERE following_id = $1
        UNION
@@ -1084,10 +1161,10 @@ async function invalidateFeedCache(userId: string) {
     );
 
     for (const row of relationsRes.rows) {
-      await client.del(`feed:user:${row.user_id}`);
+      await client.zrem(`feed:user:${row.user_id}`, postId);
     }
   } catch (err) {
-    logger.error('Failed to invalidate feed cache', { userId, error: (err as Error).message });
+    logger.error('Failed to remove post from feeds', { userId, postId, error: (err as Error).message });
   }
 }
 
@@ -1110,12 +1187,13 @@ app.post('/api/posts', authenticateToken, async (req: AuthenticatedRequest, res)
 
     const post = result.rows[0];
 
-    // Invalidate cached feeds
-    await invalidateFeedCache(userId);
-
-    // Fetch user details for response
+    // Fetch user details
     const userRes = await dbPool.query('SELECT username, full_name, avatar_url FROM users WHERE id = $1', [userId]);
     const user = userRes.rows[0];
+
+    // Run Hybrid Fan-out distribution
+    const timestamp = new Date(post.created_at).getTime();
+    await pushPostToFollowers(userId, post.id, timestamp, post, user);
 
     res.status(201).json({
       ...post,
@@ -1143,14 +1221,6 @@ app.get('/api/feed', authenticateToken, async (req: AuthenticatedRequest, res) =
     const redisClient = redisService.getClient();
     const cacheKey = `feed:user:${currentUserId}`;
 
-    // If first page and no pagination cursor, check cache
-    if (!before) {
-      const cachedFeed = await redisClient.get(cacheKey);
-      if (cachedFeed) {
-        return res.json(JSON.parse(cachedFeed));
-      }
-    }
-
     // 1. Get friend and following user IDs + currentUserId
     const userIdsRes = await dbPool.query(
       `SELECT following_id AS user_id FROM follows WHERE follower_id = $1
@@ -1162,39 +1232,135 @@ app.get('/api/feed', authenticateToken, async (req: AuthenticatedRequest, res) =
        SELECT $1 AS user_id`,
       [currentUserId]
     );
-
     const userIds = userIdsRes.rows.map(r => r.user_id);
 
-    // 2. Fetch posts
-    let query = `
-      SELECT p.*, u.username, u.full_name, u.avatar_url,
-             (SELECT COUNT(*)::int FROM comments c WHERE c.post_id = p.id) AS comment_count,
-             (SELECT COUNT(*)::int FROM reactions r WHERE r.post_id = p.id) AS reaction_count,
-             EXISTS (SELECT 1 FROM reactions r WHERE r.post_id = p.id AND r.user_id = $1) AS has_reacted,
-             (SELECT type FROM reactions r WHERE r.post_id = p.id AND r.user_id = $1) AS reaction_type
-      FROM posts p
-      JOIN users u ON p.user_id = u.id
-      WHERE p.user_id = ANY($2)
-    `;
-    const params: any[] = [currentUserId, userIds];
-
-    if (before) {
-      query += ` AND p.created_at < $3`;
-      params.push(new Date(before));
+    // 2. Check if cache exists. If not, rebuild it (Fan-out on Read backfill)
+    const cacheExists = await redisClient.exists(cacheKey);
+    if (!cacheExists && userIds.length > 0) {
+      const buildRes = await dbPool.query(
+        `SELECT id, created_at FROM posts 
+         WHERE user_id = ANY($1) 
+         ORDER BY created_at DESC LIMIT 200`,
+        [userIds]
+      );
+      
+      if (buildRes.rows.length > 0) {
+        const pipeline = redisClient.pipeline();
+        for (const row of buildRes.rows) {
+          pipeline.zadd(cacheKey, new Date(row.created_at).getTime(), row.id);
+        }
+        pipeline.expire(cacheKey, 24 * 3600); // Cache warm for 24h
+        await pipeline.exec();
+      }
     }
 
-    query += ` ORDER BY p.created_at DESC LIMIT $${params.length + 1}`;
-    params.push(limit);
+    // 3. Query post IDs from Sorted Set
+    const maxScore = before ? new Date(before).getTime() - 1 : '+inf';
+    const standardPostIds = await redisClient.zrevrangebyscore(
+      cacheKey,
+      maxScore,
+      '-inf',
+      'LIMIT',
+      0,
+      limit
+    );
 
-    const result = await dbPool.query(query, params);
-    const feed = result.rows;
+    // 4. Fetch VIPs (celebrities) whom we follow
+    // In our simplified test setup, any following user with > 100 followers is a VIP
+    const vipFollowingsRes = await dbPool.query(
+      `SELECT following_id FROM follows 
+       WHERE follower_id = $1 AND following_id IN (
+         SELECT following_id FROM follows GROUP BY following_id HAVING COUNT(*) > 100
+       )`,
+      [currentUserId]
+    );
+    const vipIds = vipFollowingsRes.rows.map(r => r.following_id);
 
-    // Cache the first page
-    if (!before) {
-      await redisClient.set(cacheKey, JSON.stringify(feed), 'EX', 300); // 5 minutes TTL
+    // Fetch VIP post IDs from their celebrity cache
+    let vipPostIds: string[] = [];
+    for (const vipId of vipIds) {
+      const vipPosts = await redisClient.zrevrangebyscore(
+        `celebrity_posts:${vipId}`,
+        maxScore,
+        '-inf',
+        'LIMIT',
+        0,
+        limit
+      );
+      vipPostIds = [...vipPostIds, ...vipPosts];
     }
 
-    res.json(feed);
+    // 5. Merge standard posts and celebrity posts, then deduplicate
+    const allPostIds = Array.from(new Set([...standardPostIds, ...vipPostIds]));
+
+    if (allPostIds.length === 0) {
+      return res.json([]);
+    }
+
+    // Helper to get detailed post details (with Redis caching)
+    const getPostDetails = async (postId: string) => {
+      const cached = await redisClient.get(`post:${postId}`);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+      
+      const dbRes = await dbPool.query(
+        `SELECT p.*, u.username, u.full_name, u.avatar_url,
+                (SELECT COUNT(*)::int FROM comments c WHERE c.post_id = p.id) AS comment_count,
+                (SELECT COUNT(*)::int FROM reactions r WHERE r.post_id = p.id) AS reaction_count
+         FROM posts p
+         JOIN users u ON p.user_id = u.id
+         WHERE p.id = $1`,
+        [postId]
+      );
+      
+      if (dbRes.rows.length === 0) return null;
+      const details = dbRes.rows[0];
+      // Cache post details for 24h
+      await redisClient.set(`post:${postId}`, JSON.stringify(details), 'EX', 24 * 3600);
+      return details;
+    };
+
+    // Hydrate all posts details in parallel
+    const postDetailsPromises = allPostIds.map(id => getPostDetails(id));
+    const rawPosts = (await Promise.all(postDetailsPromises)).filter(p => p !== null);
+
+    // Get current user reactions for these posts in one query
+    const postIdsToQuery = rawPosts.map(p => p.id);
+    const userReactions: Record<string, string | null> = {};
+    if (postIdsToQuery.length > 0) {
+      const reactionsRes = await dbPool.query(
+        `SELECT post_id, type FROM reactions WHERE user_id = $1 AND post_id = ANY($2)`,
+        [currentUserId, postIdsToQuery]
+      );
+      for (const row of reactionsRes.rows) {
+        userReactions[row.post_id] = row.type;
+      }
+    }
+
+    const posts = rawPosts.map(p => ({
+      ...p,
+      has_reacted: !!userReactions[p.id],
+      reaction_type: userReactions[p.id] || null
+    }));
+
+    // 6. Rank posts using basic EdgeRank sorting formula: Score = (Affinity * Weight) / Decay
+    const now = Date.now();
+    const rankedPosts = posts.map(post => {
+      const createdTime = new Date(post.created_at).getTime();
+      const hoursSinceCreated = (now - createdTime) / (1000 * 3600);
+      
+      const affinity = post.user_id === currentUserId ? 1.2 : 1.0;
+      const weight = (post.reaction_count * 1) + (post.comment_count * 3) + 1;
+      const decay = Math.pow(hoursSinceCreated + 2, 1.5);
+      const score = (affinity * weight) / decay;
+      
+      return { post, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map(x => x.post);
+
+    res.json(rankedPosts);
   } catch (err) {
     logger.error('Failed to load news feed', { error: (err as Error).message });
     res.status(500).json({ error: (err as Error).message });
@@ -1254,7 +1420,8 @@ app.put('/api/posts/:id', authenticateToken, async (req: AuthenticatedRequest, r
       [content || null, media_urls || '{}', postId]
     );
 
-    await invalidateFeedCache(currentUserId);
+    // Delete post details cache to force refresh
+    await redisService.getClient().del(`post:${postId}`);
     res.json(result.rows[0]);
   } catch (err) {
     logger.error('Failed to update post', { error: (err as Error).message });
@@ -1279,7 +1446,7 @@ app.delete('/api/posts/:id', authenticateToken, async (req: AuthenticatedRequest
 
     await dbPool.query('DELETE FROM posts WHERE id = $1', [postId]);
 
-    await invalidateFeedCache(currentUserId);
+    await removePostFromFeeds(currentUserId, postId);
     res.json({ message: 'Post deleted successfully' });
   } catch (err) {
     logger.error('Failed to delete post', { error: (err as Error).message });
@@ -1376,6 +1543,22 @@ app.post('/api/posts/:id/react', authenticateToken, async (req: AuthenticatedReq
       [postId, currentUserId]
     );
 
+    // Clear cached post details to sync count
+    await redisService.getClient().del(`post:${postId}`);
+
+    // Broadcast reaction count update in real-time
+    try {
+      await redisService.publish('chat:events', {
+        type: 'update_reaction',
+        data: {
+          postId,
+          reactionCount: countsRes.rows[0].count
+        }
+      });
+    } catch (redisErr) {
+      logger.error('Failed to publish update_reaction to Redis', { error: (redisErr as Error).message });
+    }
+
     res.json({
       postId,
       reaction_count: countsRes.rows[0].count,
@@ -1422,6 +1605,29 @@ app.post('/api/posts/:id/comments', authenticateToken, async (req: Authenticated
     // Fetch user details for the comment
     const userRes = await dbPool.query('SELECT username, full_name, avatar_url FROM users WHERE id = $1', [currentUserId]);
     const user = userRes.rows[0];
+
+    // Clear cached post details to sync count
+    await redisService.getClient().del(`post:${postId}`);
+
+    // Broadcast new comment in real-time
+    try {
+      await redisService.publish('chat:events', {
+        type: 'new_comment',
+        data: {
+          comment: {
+            id: comment.id,
+            post_id: postId,
+            user_id: currentUserId,
+            content: comment.content,
+            created_at: comment.created_at,
+            username: user.username,
+            avatar_url: user.avatar_url
+          }
+        }
+      });
+    } catch (redisErr) {
+      logger.error('Failed to publish new_comment to Redis', { error: (redisErr as Error).message });
+    }
 
     res.status(201).json({
       ...comment,
@@ -1618,6 +1824,75 @@ app.post('/api/notifications/read', authenticateToken, async (req: Authenticated
     res.json({ message: 'Notifications marked as read' });
   } catch (err) {
     logger.error('Failed to mark notifications read', { error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// 16. Create a Story (Protected, expires in 24 hours)
+app.post('/api/stories', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const { media_url } = req.body;
+  const currentUserId = req.user!.userId;
+
+  if (!media_url) {
+    return res.status(400).json({ error: 'Media URL is required to publish a story' });
+  }
+
+  try {
+    const result = await dbPool.query(
+      `INSERT INTO stories (user_id, media_url, expires_at)
+       VALUES ($1, $2, NOW() + INTERVAL '24 hours')
+       RETURNING *`,
+      [currentUserId, media_url]
+    );
+
+    const story = result.rows[0];
+    
+    // Fetch author details
+    const userRes = await dbPool.query('SELECT username, avatar_url FROM users WHERE id = $1', [currentUserId]);
+    const user = userRes.rows[0];
+
+    res.status(201).json({
+      ...story,
+      username: user.username,
+      avatar_url: user.avatar_url
+    });
+  } catch (err) {
+    logger.error('Failed to create story', { error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// 17. Fetch Active Stories (Protected)
+app.get('/api/stories', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const currentUserId = req.user!.userId;
+
+  try {
+    // 1. Get friend and following user IDs + currentUserId
+    const userIdsRes = await dbPool.query(
+      `SELECT following_id AS user_id FROM follows WHERE follower_id = $1
+       UNION
+       SELECT CASE WHEN user_id_1 = $1 THEN user_id_2 ELSE user_id_1 END AS user_id 
+       FROM friendships 
+       WHERE (user_id_1 = $1 OR user_id_2 = $1) AND status = 'accepted'
+       UNION
+       SELECT $1 AS user_id`,
+      [currentUserId]
+    );
+    const userIds = userIdsRes.rows.map(r => r.user_id);
+
+    // 2. Fetch active stories where expires_at is greater than current time
+    const result = await dbPool.query(
+      `SELECT s.id, s.user_id, s.media_url as thumbnail_url, s.created_at, u.username, u.avatar_url as user_avatar
+       FROM stories s
+       JOIN users u ON s.user_id = u.id
+       WHERE s.user_id = ANY($1) AND s.expires_at > NOW()
+       ORDER BY s.created_at DESC`,
+      [userIds]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    logger.error('Failed to fetch active stories', { error: (err as Error).message });
     res.status(500).json({ error: (err as Error).message });
   }
 });

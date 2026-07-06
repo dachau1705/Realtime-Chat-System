@@ -100,6 +100,18 @@ export async function bootstrapGateway() {
           const notif = event.data;
           io.to(`user:${notif.user_id}`).emit('notification', notif);
           logger.info(`Forwarded notification of type ${notif.type} to user:${notif.user_id}`);
+        } else if (event.type === 'new_feed_item') {
+          const { followerId, post } = event.data;
+          io.to(`user:${followerId}`).emit('NEW_FEED_ITEM', post);
+          logger.info(`Forwarded NEW_FEED_ITEM event to user:${followerId} for post ${post.id}`);
+        } else if (event.type === 'update_reaction') {
+          const { postId, reactionCount } = event.data;
+          io.emit('UPDATE_REACTION', { postId, reactionCount });
+          logger.info(`Broadcasted UPDATE_REACTION event for post ${postId}`);
+        } else if (event.type === 'new_comment') {
+          const { comment } = event.data;
+          io.emit('NEW_COMMENT', comment);
+          logger.info(`Broadcasted NEW_COMMENT event for post ${comment.post_id}`);
         }
       });
       logger.info('Successfully subscribed to Redis Pub/Sub channel.');

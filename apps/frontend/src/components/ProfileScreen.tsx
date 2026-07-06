@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
-import { PostCard } from './PostCard';
+import { PostCard } from './post/PostCard';
 import { 
   fetchUserProfile, 
   updateUserProfile, 

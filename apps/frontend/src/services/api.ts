@@ -632,3 +632,61 @@ export async function markNotificationsAsRead(token: string, notificationId?: st
   if (!res.ok) throw new Error(data.error || 'Failed to update notifications status');
   return data;
 }
+
+/**
+ * Facebook-style Story item expiring after 24 hours.
+ */
+export interface Story {
+  id: string;
+  userId: string;
+  username: string;
+  userAvatar: string | null;
+  thumbnailUrl: string;
+  createdAt: string;
+  expiresAt?: string;
+  isViewed?: boolean;
+}
+
+/**
+ * Fetches recent active stories from the gateway.
+ */
+export async function fetchStories(token: string): Promise<Story[]> {
+  const res = await fetch('/api/stories', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to load stories');
+  return (data || []).map((item: any) => ({
+    id: item.id,
+    userId: item.user_id,
+    username: item.username,
+    userAvatar: item.user_avatar,
+    thumbnailUrl: item.thumbnail_url,
+    createdAt: item.created_at,
+    isViewed: false
+  }));
+}
+
+/**
+ * Creates/publishes a story by uploading a media url.
+ */
+export async function createStory(token: string, mediaUrl: string): Promise<Story> {
+  const res = await fetch('/api/stories', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ media_url: mediaUrl })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to publish story');
+  return {
+    id: data.id,
+    userId: data.user_id,
+    username: data.username,
+    userAvatar: data.avatar_url,
+    thumbnailUrl: data.media_url,
+    createdAt: data.created_at
+  };
+}

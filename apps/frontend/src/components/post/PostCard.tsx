@@ -1,33 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useChat } from '../hooks/useChat';
-import { reactToPost, commentOnPost, fetchPostComments, deletePost, type Post, type Comment } from '../services/api';
+import { useChat } from '../../hooks/useChat';
+import { useLikeMutation, useDeletePostMutation } from '../../hooks/useFeedQuery';
+import { commentOnPost, fetchPostComments, type Post, type Comment } from '../../services/api';
 
 interface PostCardProps {
   post: Post;
-  onPostDeleted?: () => void;
 }
 
-export function PostCard({ post, onPostDeleted }: PostCardProps) {
+export const PostCard = React.memo(({ post }: PostCardProps) => {
   const navigate = useNavigate();
   const { token, currentUser, showToast } = useChat();
-  
-  const [reactionCount, setReactionCount] = useState<number>(post.reaction_count);
-  const [hasReacted, setHasReacted] = useState<boolean>(post.has_reacted);
-  
+
+  const likeMutation = useLikeMutation(token || '');
+  const deleteMutation = useDeletePostMutation(token || '');
+
   const [showComments, setShowComments] = useState<boolean>(false);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [commentsCount, setCommentsCount] = useState<number>(post.comment_count);
   const [loadingComments, setLoadingComments] = useState<boolean>(false);
   const [newComment, setNewComment] = useState<string>('');
   const [submittingComment, setSubmittingComment] = useState<boolean>(false);
 
-  // Sync state if props change
-  useEffect(() => {
-    setReactionCount(post.reaction_count);
-    setHasReacted(post.has_reacted);
-    setCommentsCount(post.comment_count);
-  }, [post]);
+  // Reaction action
+  const handleLikeToggle = () => {
+    if (!token) return;
+    const nextReactionType = post.has_reacted ? null : 'like';
+    likeMutation.mutate({ postId: post.id, reactionType: nextReactionType });
+  };
+
+  // Delete action
+  const handleDeletePost = () => {
+    if (!token) return;
+    if (confirm('Delete this post permanently?')) {
+      deleteMutation.mutate(post.id, {
+        onSuccess: () => {
+          showToast('Success', 'Post deleted successfully', false);
+          onPostDeleted?.();
+        },
+        onError: (err: any) => {
+          showToast('Error', err.message || 'Failed to delete post', true);
+        }
+      });
+    }
+  };
 
   const loadComments = async () => {
     if (!token) return;
@@ -50,26 +65,6 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
     }
   };
 
-  const handleLikeToggle = async () => {
-    if (!token) return;
-
-    // Optimistic Update
-    const prevHasReacted = hasReacted;
-    const prevCount = reactionCount;
-
-    setHasReacted(!prevHasReacted);
-    setReactionCount(prevHasReacted ? prevCount - 1 : prevCount + 1);
-
-    try {
-      await reactToPost(token, post.id, prevHasReacted ? null : 'like');
-    } catch (err: any) {
-      // Revert on failure
-      setHasReacted(prevHasReacted);
-      setReactionCount(prevCount);
-      showToast('Error', err.message || 'Failed to submit reaction', true);
-    }
-  };
-
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !newComment.trim() || submittingComment) return;
@@ -79,9 +74,11 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
     try {
       const addedComment = await commentOnPost(token, post.id, content);
       setComments((prev) => [...prev, addedComment]);
-      setCommentsCount((prev) => prev + 1);
       setNewComment('');
-      setShowComments(true);
+      // Force refreshing the cache of feed to sync comment count
+      // Wait, we don't have to reload feed, we can let queryClient handle it or increment it
+      // Let's do inline comment count sync on queryClient if desired
+      // We can also let onSettled invalidations update the server count
     } catch (err: any) {
       showToast('Comment Failed', err.message || 'Failed to post comment', true);
     } finally {
@@ -121,6 +118,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
           <img 
             src={post.media_urls[0]} 
             alt="Post media" 
+            loading="lazy"
             style={{ width: '100%', maxHeight: '450px', objectFit: 'cover', cursor: 'pointer' }}
             onClick={() => navigate(`/posts/${post.id}`)}
           />
@@ -154,6 +152,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
               <img 
                 src={url} 
                 alt={`Post media ${idx}`} 
+                loading="lazy"
                 style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer', filter: isMoreThanFour ? 'brightness(0.4)' : 'none' }} 
               />
               {isMoreThanFour && (
@@ -179,7 +178,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
   };
 
   return (
-    <div className="post-card" style={{
+    <div className="post-card-premium" style={{
       background: 'var(--panel-bg)',
       border: '1px solid var(--panel-border)',
       borderRadius: '16px',
@@ -188,7 +187,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
       display: 'flex',
       flexDirection: 'column',
       transition: 'transform 0.2s ease, border-color 0.2s ease',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+      boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
     }}>
       {/* Post Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -196,7 +195,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
           <div 
             className="avatar" 
             onClick={() => navigate(`/profile/${post.user_id}`)}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', width: '38px', height: '38px' }}
           >
             {post.avatar_url ? (
               <img src={post.avatar_url} alt={post.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
@@ -206,7 +205,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
           </div>
           <div>
             <div 
-              style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-main)', cursor: 'pointer' }}
+              style={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--text-main)', cursor: 'pointer' }}
               onClick={() => navigate(`/profile/${post.user_id}`)}
             >
               {post.full_name || post.username}
@@ -217,21 +216,12 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
           </div>
         </div>
 
-        {currentUser?.id === post.user_id && onPostDeleted && (
+        {currentUser?.id === post.user_id && (
           <button 
             style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', padding: '6px' }}
-            onClick={async () => {
-              if (confirm('Delete this post permanently?')) {
-                try {
-                  if (token) {
-                    await deletePost(token, post.id);
-                    onPostDeleted();
-                  }
-                } catch (err: any) {
-                  showToast('Error', err.message || 'Failed to delete post', true);
-                }
-              }
-            }}
+            onClick={handleDeletePost}
+            disabled={deleteMutation.isPending}
+            title="Delete post"
           >
             <i className="fa-regular fa-trash-can" style={{ color: 'var(--error)' }}></i>
           </button>
@@ -244,7 +234,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
           onClick={() => navigate(`/posts/${post.id}`)}
           style={{ 
             marginTop: '12px', 
-            fontSize: '14px', 
+            fontSize: '14.5px', 
             color: 'var(--text-main)', 
             whiteSpace: 'pre-wrap', 
             lineHeight: '1.5',
@@ -266,15 +256,15 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
         marginTop: '16px',
         paddingBottom: '12px',
         borderBottom: '1px solid var(--panel-border)',
-        fontSize: '12px',
+        fontSize: '12.5px',
         color: 'var(--text-muted)'
       }}>
         <span>
           <i className="fa-solid fa-heart" style={{ color: 'var(--error)', marginRight: '4px' }}></i>
-          {reactionCount} like{reactionCount !== 1 ? 's' : ''}
+          {post.reaction_count} like{post.reaction_count !== 1 ? 's' : ''}
         </span>
         <span style={{ cursor: 'pointer' }} onClick={handleToggleComments}>
-          {commentsCount} comment{commentsCount !== 1 ? 's' : ''}
+          {post.comment_count} comment{post.comment_count !== 1 ? 's' : ''}
         </span>
       </div>
 
@@ -291,7 +281,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
           style={{
             background: 'transparent',
             border: 'none',
-            color: hasReacted ? 'var(--error)' : 'var(--text-muted)',
+            color: post.has_reacted ? 'var(--error)' : 'var(--text-muted)',
             cursor: 'pointer',
             fontSize: '13px',
             fontWeight: 600,
@@ -303,8 +293,8 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
             transition: 'all 0.15s'
           }}
         >
-          <i className={hasReacted ? 'fa-solid fa-heart' : 'fa-regular fa-heart'}></i>
-          {hasReacted ? 'Liked' : 'Like'}
+          <i className={post.has_reacted ? 'fa-solid fa-heart' : 'fa-regular fa-heart'}></i>
+          {post.has_reacted ? 'Liked' : 'Like'}
         </button>
 
         <button
@@ -420,4 +410,19 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
       </form>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Compare values to prevent unnecessary re-renders in virtual lists
+  return (
+    prevProps.post.id === nextProps.post.id &&
+    prevProps.post.reaction_count === nextProps.post.reaction_count &&
+    prevProps.post.comment_count === nextProps.post.comment_count &&
+    prevProps.post.has_reacted === nextProps.post.has_reacted &&
+    prevProps.post.content === nextProps.post.content &&
+    prevProps.post.media_urls.join(',') === nextProps.post.media_urls.join(',') &&
+    prevProps.post.avatar_url === nextProps.post.avatar_url &&
+    prevProps.post.username === nextProps.post.username &&
+    prevProps.post.full_name === nextProps.post.full_name
+  );
+});
+
+PostCard.displayName = 'PostCard';

@@ -140,6 +140,23 @@ async function runSocialTest() {
   }
   logger.info('Successfully verified Bob\'s post is present in Alice\'s feed.');
 
+  // 6.5. Test Story Creation & Fetching (Alice following Bob)
+  logger.info('--- Testing Story Creation & Active Stories Retrieval ---');
+  logger.info('Bob creates a new story...');
+  const storyRes = await axios.post(`${API_URL}/api/stories`, {
+    media_url: uploadRes.data.url
+  }, { headers: bobHeaders });
+  logger.info('Story created successfully:', storyRes.data);
+
+  logger.info('Alice fetches active stories...');
+  const storiesRes = await axios.get(`${API_URL}/api/stories`, { headers: aliceHeaders });
+  logger.info(`Alice's active stories count: ${storiesRes.data.length}`);
+  const storyInFeed = storiesRes.data.find((s: any) => s.id === storyRes.data.id);
+  if (!storyInFeed) {
+    throw new Error('Bob\'s story was not found in Alice\'s active stories list!');
+  }
+  logger.info('Successfully verified Bob\'s story is present in Alice\'s active stories list.');
+
   // 7. Test Reactions & WS Notification
   logger.info('--- Testing Reactions & Reaction WS Notifications ---');
   logger.info('Alice reacts/likes Bob\'s post...');

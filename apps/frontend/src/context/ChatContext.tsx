@@ -41,6 +41,7 @@ interface ChatContextType {
   typingStatusText: string;
   pendingQueue: any[];
   unreadBadges: Record<string, number>;
+  socket: Socket | null;
 
   connectSocket: (userToken: string) => void;
   toggleSocketConnection: () => void;
@@ -662,6 +663,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       typingStatusText,
       pendingQueue,
       unreadBadges,
+      socket: socketRef.current,
 
       connectSocket,
       toggleSocketConnection,

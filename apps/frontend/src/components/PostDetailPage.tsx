@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
-import { PostCard } from './PostCard';
+import { PostCard } from './post/PostCard';
 import { fetchPostDetails, fetchPostComments, commentOnPost, type Post, type Comment } from '../services/api';
 
 export function PostDetailPage() {
