@@ -149,4 +149,147 @@ CREATE TABLE IF NOT EXISTS stories (
 );
 CREATE INDEX IF NOT EXISTS idx_stories_user_expires ON stories(user_id, expires_at DESC);
 
+-- 12. Page Categories table
+CREATE TABLE IF NOT EXISTS page_categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    slug VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed basic categories if not exists
+INSERT INTO page_categories (name, slug, description) VALUES
+('Business', 'business', 'Organizations, startups, corporate offices'),
+('Company', 'company', 'Regional companies, enterprise networks'),
+('Brand', 'brand', 'Apparel, merchandise, digital products'),
+('Public Figure', 'public-figure', 'Creators, public figures, artists'),
+('Community', 'community', 'Discussion hubs, public groups, forums'),
+('Local Store', 'local-store', 'Cafes, supermarkets, physical boutiques')
+ON CONFLICT (name) DO NOTHING;
+
+-- 13. Pages table
+CREATE TABLE IF NOT EXISTS pages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    owner_user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    page_name VARCHAR(150) NOT NULL,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    slug VARCHAR(150) UNIQUE NOT NULL,
+    category_id INT REFERENCES page_categories(id) NOT NULL,
+    description TEXT,
+    phone VARCHAR(30),
+    email VARCHAR(100),
+    website VARCHAR(255),
+    location VARCHAR(255),
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    avatar VARCHAR(1024),
+    cover_photo VARCHAR(1024),
+    verification_status VARCHAR(20) DEFAULT 'unverified' NOT NULL, -- 'unverified', 'pending', 'verified', 'rejected'
+    visibility VARCHAR(20) DEFAULT 'public' NOT NULL, -- 'public', 'private', 'hidden'
+    followers_count INT DEFAULT 0 NOT NULL,
+    likes_count INT DEFAULT 0 NOT NULL,
+    posts_count INT DEFAULT 0 NOT NULL,
+    rating DECIMAL(3, 2) DEFAULT 0.00 NOT NULL,
+    review_count INT DEFAULT 0 NOT NULL,
+    status VARCHAR(20) DEFAULT 'active' NOT NULL, -- 'active', 'suspended', 'deleted'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pages_owner ON pages(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_pages_category ON pages(category_id);
+CREATE INDEX IF NOT EXISTS idx_pages_status_visibility ON pages(status, visibility);
+
+-- 14. Page Settings table
+CREATE TABLE IF NOT EXISTS page_settings (
+    page_id UUID PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
+    allow_visitor_posts BOOLEAN DEFAULT TRUE NOT NULL,
+    allow_tagging BOOLEAN DEFAULT TRUE NOT NULL,
+    allow_mentions BOOLEAN DEFAULT TRUE NOT NULL,
+    profanity_filter_level VARCHAR(20) DEFAULT 'medium' NOT NULL, -- 'none', 'medium', 'strong'
+    age_restriction INT DEFAULT 0 NOT NULL,
+    country_restrictions TEXT, -- JSON Array of countries
+    auto_reply_enabled BOOLEAN DEFAULT FALSE NOT NULL,
+    auto_reply_message TEXT,
+    auto_reply_keywords TEXT, -- JSON Array of keywords
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 15. Page Members (Access Roster)
+CREATE TABLE IF NOT EXISTS page_members (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    page_id UUID REFERENCES pages(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    role VARCHAR(30) NOT NULL, -- 'owner', 'admin', 'editor', 'moderator', 'advertiser', 'analyst', 'viewer'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_page_user_membership UNIQUE (page_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_page_members_user ON page_members(user_id);
+
+-- 16. Page Followers table
+CREATE TABLE IF NOT EXISTS page_followers (
+    page_id UUID REFERENCES pages(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    is_liked BOOLEAN DEFAULT TRUE NOT NULL,
+    is_favorite BOOLEAN DEFAULT FALSE NOT NULL,
+    is_muted BOOLEAN DEFAULT FALSE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (page_id, user_id)
+);
+
+-- 17. Page Posts table
+CREATE TABLE IF NOT EXISTS page_posts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    page_id UUID REFERENCES pages(id) ON DELETE CASCADE NOT NULL,
+    author_user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    content TEXT NULL,
+    post_type VARCHAR(20) DEFAULT 'text' NOT NULL, -- 'text', 'image', 'video'
+    status VARCHAR(20) DEFAULT 'published' NOT NULL, -- 'published', 'draft', 'scheduled'
+    is_pinned BOOLEAN DEFAULT FALSE NOT NULL,
+    is_featured BOOLEAN DEFAULT FALSE NOT NULL,
+    is_boosted BOOLEAN DEFAULT FALSE NOT NULL,
+    feeling VARCHAR(50) NULL,
+    location_name VARCHAR(150) NULL,
+    media_urls TEXT[] DEFAULT '{}'::TEXT[] NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_page_posts_query ON page_posts(page_id, status, created_at DESC);
+
+-- 18. Page Reviews table
+CREATE TABLE IF NOT EXISTS page_reviews (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    page_id UUID REFERENCES pages(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    review_text TEXT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_page_user_review UNIQUE (page_id, user_id)
+);
+
+-- 19. Page Post Likes (Reactions) table
+CREATE TABLE IF NOT EXISTS page_post_likes (
+    post_id UUID REFERENCES page_posts(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    type VARCHAR(20) DEFAULT 'like' NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (post_id, user_id)
+);
+
+-- 20. Page Post Comments table
+CREATE TABLE IF NOT EXISTS page_post_comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    post_id UUID REFERENCES page_posts(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    content TEXT NOT NULL,
+    parent_id UUID REFERENCES page_post_comments(id) ON DELETE CASCADE NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_page_post_comments_query ON page_post_comments(post_id, created_at ASC);
+
+
 

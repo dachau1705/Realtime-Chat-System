@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChat } from '../../hooks/useChat';
 import { useLikeMutation, useDeletePostMutation } from '../../hooks/useFeedQuery';
@@ -6,9 +6,10 @@ import { commentOnPost, fetchPostComments, type Post, type Comment } from '../..
 
 interface PostCardProps {
   post: Post;
+  onPostDeleted?: () => void;
 }
 
-export const PostCard = React.memo(({ post }: PostCardProps) => {
+export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
   const navigate = useNavigate();
   const { token, currentUser, showToast } = useChat();
 

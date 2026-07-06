@@ -1,49 +1,19 @@
 import express from 'express';
 import { dbPool, logger } from '@libs/common';
-import { RedisService } from '@libs/redis';
-import { KafkaService } from '@libs/kafka';
 import crypto from 'crypto';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import sharp from 'sharp';
 import fs from 'fs';
-import { v2 as cloudinary } from 'cloudinary';
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'datjttwmv',
-  api_key: process.env.CLOUDINARY_API_KEY || '327283535632842',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'SZF_I7q4mwrzPikBktbkMLRbTmI'
-});
-
-// Helper function to upload buffer to Cloudinary
-function uploadToCloudinary(
-  fileBuffer: Buffer,
-  publicId: string,
-  folder: string = 'chat'
-): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        public_id: publicId,
-        folder: folder,
-        overwrite: true,
-        invalidate: true
-      },
-      (error, result) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(result);
-        }
-      }
-    );
-    uploadStream.write(fileBuffer);
-    uploadStream.end();
-  });
-}
-
+// Modular Configurations, Middlewares, and Utilities
+import { redisService, initKafka } from './config/services';
+import { hashPassword, comparePassword } from './utils/crypto';
+import { uploadToCloudinary, cloudinary } from './utils/cloudinary';
+import { createNotification } from './utils/notification';
+import { createRateLimiter } from './middleware/rate-limiter';
+import { authenticateToken, AuthenticatedRequest } from './middleware/auth.middleware';
 
 const app = express();
 app.use(express.json());
@@ -58,164 +28,12 @@ app.use('/uploads', express.static(uploadsDir));
 const PORT = parseInt(process.env.API_PORT || '3000', 10);
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 
-const redisService = new RedisService();
-const kafkaService = new KafkaService();
-let isKafkaAvailable = true;
-
-async function initKafka() {
-  try {
-    await kafkaService.getProducer();
-    await kafkaService.ensureTopics(['social.notifications']);
-    logger.info('API Gateway successfully connected to Kafka for social notifications.');
-  } catch (err) {
-    logger.warn('Kafka offline for API Gateway. Running notifications in fallback direct-write mode.', {
-      error: (err as Error).message
-    });
-    isKafkaAvailable = false;
-  }
-}
+// Initialize Kafka social events pipeline
 initKafka();
-
-async function createNotification(
-  userId: string,
-  actorId: string,
-  type: string,
-  postId?: string | null,
-  commentId?: string | null
-) {
-  if (userId === actorId) return; // Don't notify self
-
-  const notificationPayload = {
-    id: crypto.randomUUID(),
-    user_id: userId,
-    actor_id: actorId,
-    type,
-    post_id: postId || null,
-    comment_id: commentId || null,
-    is_read: false,
-    created_at: new Date()
-  };
-
-  let processed = false;
-  if (isKafkaAvailable) {
-    try {
-      await kafkaService.publishMessage('social.notifications', userId, notificationPayload);
-      processed = true;
-    } catch (err) {
-      logger.error('Failed to publish notification to Kafka, falling back to direct write', { error: (err as Error).message });
-      isKafkaAvailable = false;
-    }
-  }
-
-  if (!processed) {
-    // Direct SQL insert fallback
-    try {
-      await dbPool.query(
-        `INSERT INTO notifications (id, user_id, actor_id, type, post_id, comment_id, is_read, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
-          notificationPayload.id,
-          notificationPayload.user_id,
-          notificationPayload.actor_id,
-          notificationPayload.type,
-          notificationPayload.post_id,
-          notificationPayload.comment_id,
-          notificationPayload.is_read,
-          notificationPayload.created_at
-        ]
-      );
-
-      // Publish directly to Redis so websocket server forwards it in real-time
-      const actorRes = await dbPool.query('SELECT username, avatar_url FROM users WHERE id = $1', [actorId]);
-      const actorInfo = actorRes.rows[0] || {};
-      
-      await redisService.publish('chat:events', {
-        type: 'notification',
-        data: {
-          ...notificationPayload,
-          actor_username: actorInfo.username,
-          actor_avatar_url: actorInfo.avatar_url
-        }
-      });
-    } catch (err) {
-      logger.error('Failed to save fallback notification to database', { error: (err as Error).message });
-    }
-  }
-}
-
-function hashPassword(password: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const salt = crypto.randomBytes(16).toString('hex');
-    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
-      if (err) return reject(err);
-      resolve(`${salt}:${derivedKey.toString('hex')}`);
-    });
-  });
-}
-
-function comparePassword(password: string, hash: string): Promise<boolean> {
-  return new Promise((resolve, reject) => {
-    const parts = hash.split(':');
-    if (parts.length !== 2) {
-      // Fallback for legacy sha256 hashes if any exist
-      const fallbackHash = crypto.createHash('sha256').update(password).digest('hex');
-      return resolve(hash === fallbackHash);
-    }
-    const [salt, key] = parts;
-    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
-      if (err) return reject(err);
-      resolve(key === derivedKey.toString('hex'));
-    });
-  });
-}
-
-function createRateLimiter(redisService: RedisService, limit: number, windowSeconds: number) {
-  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown-ip';
-    const key = `ratelimit:${ip}`;
-    try {
-      const client = redisService.getClient();
-      const current = await client.incr(key);
-      if (current === 1) {
-        await client.expire(key, windowSeconds);
-      }
-      if (current > limit) {
-        logger.warn('Rate limit exceeded', { ip, limit, current });
-        return res.status(429).json({ error: 'Too many requests, please try again later.' });
-      }
-      next();
-    } catch (err) {
-      logger.warn('Rate limiter Redis error, failing open', { error: (err as Error).message });
-      next();
-    }
-  };
-}
 
 const authLimiter = createRateLimiter(redisService, 15, 60);
 
-export interface AuthenticatedRequest extends express.Request {
-  user?: {
-    userId: string;
-    username: string;
-  };
-}
 
-export function authenticateToken(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
-    req.user = decoded as { userId: string; username: string };
-    next();
-  });
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -346,6 +164,29 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   }
 });
 
+// 2.9. Search Users (Protected)
+app.get('/api/search/users', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const q = req.query.q;
+  if (!q || typeof q !== 'string') {
+    return res.json([]);
+  }
+  const currentUserId = req.user!.userId;
+  try {
+    const result = await dbPool.query(
+      `SELECT id, username, email, full_name, avatar_url 
+       FROM users 
+       WHERE (username ILIKE $1 OR email ILIKE $1 OR full_name ILIKE $1)
+         AND id != $2
+       LIMIT 10`,
+      [`%${q}%`, currentUserId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    logger.error('Failed to search users', { error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 // 3. Fetch Users (Protected - Returns only accepted friends)
 app.get('/api/users', authenticateToken, async (req: AuthenticatedRequest, res) => {
   const currentUserId = req.user!.userId;
@@ -463,7 +304,6 @@ app.put('/api/users/:id', authenticateToken, async (req: AuthenticatedRequest, r
 
     // Broadcast profile update via Redis Pub/Sub
     try {
-      const redisService = new RedisService();
       await redisService.publish('chat:events', {
         type: 'profile_update',
         data: {
@@ -517,7 +357,6 @@ app.post('/api/upload/avatar', authenticateToken, upload.single('file'), async (
 
     // Broadcast update
     try {
-      const redisService = new RedisService();
       await redisService.publish('chat:events', {
         type: 'profile_update',
         data: {
@@ -1896,6 +1735,10 @@ app.get('/api/stories', authenticateToken, async (req: AuthenticatedRequest, res
     res.status(500).json({ error: (err as Error).message });
   }
 });
+
+// Mount modular routers
+import mainRouter from './routes';
+app.use(mainRouter);
 
 // Serve SPA index.html for any frontend client-side router path (e.g. /profile/:id)
 app.get('*', (req, res) => {

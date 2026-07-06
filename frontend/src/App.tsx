@@ -7,6 +7,10 @@ import { ChatArea } from './components/ChatArea';
 import { ProfileScreen } from './components/ProfileScreen';
 import { FeedPage } from './components/FeedPage';
 import { PostDetailPage } from './components/PostDetailPage';
+import { Header } from './components/Header';
+import { Footer } from './components/Footer';
+import PageCreationWizard from './components/PageCreationWizard';
+import { PageDetail } from './components/PageDetail';
 
 export default function App() {
   const { token, setToken, setCurrentUser, connectSocket, toasts, dismissToast, activeTab, setActiveTab } = useChat();
@@ -45,22 +49,32 @@ export default function App() {
       {!token ? (
         <AuthModal />
       ) : (
-        <Routes>
-          <Route path="/" element={
-            <div className="container">
-              <Sidebar />
-              <FeedPage />
+        <div className="app-layout-wrapper">
+          <Header />
+          <div className="app-main-viewport" style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flexGrow: 1, flexShrink: 0 }}>
+              <Routes>
+                <Route path="/" element={
+                  <div className="container">
+                    <Sidebar />
+                    <FeedPage />
+                  </div>
+                } />
+                <Route path="/chat" element={
+                  <div className="container">
+                    <Sidebar />
+                    <ChatArea />
+                  </div>
+                } />
+                <Route path="/profile/:id" element={<ProfileScreen />} />
+                <Route path="/posts/:id" element={<PostDetailPage />} />
+                <Route path="/pages/create" element={<PageCreationWizard />} />
+                <Route path="/pages/:id" element={<PageDetail />} />
+              </Routes>
             </div>
-          } />
-          <Route path="/chat" element={
-            <div className="container">
-              <Sidebar />
-              <ChatArea />
-            </div>
-          } />
-          <Route path="/profile/:id" element={<ProfileScreen />} />
-          <Route path="/posts/:id" element={<PostDetailPage />} />
-        </Routes>
+            <Footer />
+          </div>
+        </div>
       )}
 
       {/* Toast Notification HUD */}

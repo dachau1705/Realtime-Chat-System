@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
 import { FeedContainer } from './feed/FeedContainer';
-import { fetchSuggestions, followUser, type UserSuggestion, type User } from '../services/api';
+import { fetchSuggestions, followUser, type UserSuggestion } from '../services/api';
 
 export function FeedPage() {
   const navigate = useNavigate();
-  const { token, showToast, users, socketConnected } = useChat();
+  const { token, showToast, users } = useChat();
 
   const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState<boolean>(true);
@@ -125,7 +125,7 @@ export function FeedPage() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    background: 'rgba(255, 255, 255, 0.03)',
+                    background: 'var(--panel-bg)',
                     border: '1px solid var(--panel-border)',
                     borderRadius: '12px',
                     padding: '8px 12px',

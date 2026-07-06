@@ -1,4 +1,3 @@
-import React from 'react';
 import { type Story } from '../../services/api';
 
 interface StoryCardProps {
