@@ -11,6 +11,7 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import PageCreationWizard from './components/PageCreationWizard';
 import { PageDetail } from './components/PageDetail';
+import { FriendsMainPage } from './components/FriendsMainPage';
 
 export default function App() {
   const { token, setToken, setCurrentUser, connectSocket, toasts, dismissToast, activeTab, setActiveTab } = useChat();
@@ -37,8 +38,14 @@ export default function App() {
           setActiveTab('feed');
         }
       } else if (location.pathname === '/chat') {
-        if (activeTab === 'feed') {
+        if (activeTab !== 'conversations' && activeTab !== 'requests') {
           setActiveTab('conversations');
+        }
+      } else if (location.pathname.startsWith('/friends')) {
+        const isRequests = location.pathname === '/friends/requests';
+        const targetTab = isRequests ? 'requests' : 'users';
+        if (activeTab !== targetTab) {
+          setActiveTab(targetTab);
         }
       }
     }
@@ -66,6 +73,9 @@ export default function App() {
                     <ChatArea />
                   </div>
                 } />
+                <Route path="/friends" element={<FriendsMainPage />} />
+                <Route path="/friends/:subview" element={<FriendsMainPage />} />
+                <Route path="/friends/requests/:requestId" element={<FriendsMainPage />} />
                 <Route path="/profile/:id" element={<ProfileScreen />} />
                 <Route path="/posts/:id" element={<PostDetailPage />} />
                 <Route path="/pages/create" element={<PageCreationWizard />} />

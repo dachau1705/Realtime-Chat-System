@@ -130,7 +130,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
   try {
     const result = await dbPool.query(
-      'SELECT id, username, email, password_hash FROM users WHERE username = $1',
+      'SELECT id, username, email, full_name, avatar_url, password_hash FROM users WHERE username = $1',
       [username]
     );
 
@@ -155,7 +155,9 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        full_name: user.full_name,
+        avatar_url: user.avatar_url
       }
     });
   } catch (err) {
@@ -204,6 +206,32 @@ app.get('/api/users', authenticateToken, async (req: AuthenticatedRequest, res) 
     res.json(result.rows);
   } catch (err) {
     logger.error('Failed to fetch user friends list', { error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// 3.05. Fetch User Suggestions (Protected)
+app.get('/api/users/suggestions', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const currentUserId = req.user!.userId;
+  try {
+    const result = await dbPool.query(
+      `SELECT id, username, email, full_name, avatar_url 
+       FROM users 
+       WHERE id != $1
+         AND id NOT IN (
+           SELECT CASE 
+             WHEN user_id_1 = $1 THEN user_id_2 
+             ELSE user_id_1 
+           END 
+           FROM friendships 
+           WHERE user_id_1 = $1 OR user_id_2 = $1
+         )
+       LIMIT 10`,
+      [currentUserId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    logger.error('Failed to fetch user suggestions', { error: (err as Error).message });
     res.status(500).json({ error: (err as Error).message });
   }
 });

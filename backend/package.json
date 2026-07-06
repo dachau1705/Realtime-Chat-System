@@ -13,7 +13,8 @@
     "test:load": "ts-node -r tsconfig-paths/register tests/load-test.ts",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
-    "db:migrate": "ts-node -r tsconfig-paths/register migrations/migrate.ts"
+    "db:migrate": "ts-node -r tsconfig-paths/register migrations/migrate.ts",
+    "start:all": "concurrently --names \"API,WS,WRK\" -c \"blue,green,magenta\" \"npm run start:api\" \"npm run start:ws\" \"npm run start:worker\""
   },
   "dependencies": {
     "@types/multer": "^2.1.0",
@@ -39,6 +40,7 @@
     "@types/node": "^20.8.10",
     "@types/pg": "^8.10.7",
     "@types/uuid": "^9.0.6",
+    "concurrently": "^8.2.2",
     "form-data": "^4.0.5",
     "nodemon": "^3.0.1",
     "ts-node": "^10.9.1",

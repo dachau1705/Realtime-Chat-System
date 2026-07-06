@@ -8,17 +8,16 @@ export function Sidebar() {
   const [adding, setAdding] = useState<boolean>(false);
   const [addResultMsg, setAddResultMsg] = useState<{ text: string; isError: boolean } | null>(null);
 
-  const { 
-    currentUser, 
-    activeTab, 
-    setActiveTab, 
-    conversations, 
-    users, 
+  const {
+    currentUser,
+    activeTab,
+    setActiveTab,
+    conversations,
+    users,
     friendRequests,
-    currentRoomId, 
+    currentRoomId,
     unreadBadges,
     socketConnected,
-    logout,
     selectConversation,
     startChatWithUser,
     loadConversations,
@@ -64,12 +63,6 @@ export function Sidebar() {
     }
   };
 
-  const handleLogoutClick = () => {
-    if (confirm("Are you sure you want to log out?")) {
-      logout();
-    }
-  };
-
   const handleProfileClick = () => {
     if (currentUser?.id) {
       navigate(`/profile/${currentUser.id}`);
@@ -79,18 +72,6 @@ export function Sidebar() {
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <div className="sidebar-title-row">
-          <h2>
-            <i className="fa-solid fa-comments"></i> HODA Chat
-          </h2>
-          <button 
-            className="sidebar-logout-btn" 
-            onClick={handleLogoutClick} 
-            title="Log out"
-          >
-            <i className="fa-solid fa-right-from-bracket"></i>
-          </button>
-        </div>
         <div className="user-selector" onClick={handleProfileClick} title="View your profile">
           <div className="avatar" id="myAvatar">
             {currentUser?.avatar_url ? (
@@ -111,124 +92,50 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div className="sidebar-tabs" style={{ display: 'flex', borderBottom: '1px solid var(--panel-border)', background: 'rgba(0,0,0,0.1)' }}>
-        <button 
-          className={`tab-btn ${activeTab === 'feed' ? 'active' : ''}`} 
+      <div className="sidebar-tabs">
+        <button
+          className={`tab-btn ${activeTab === 'feed' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('feed');
             markNotificationsRead();
             navigate('/');
           }}
-          style={{
-            flex: 1,
-            padding: '12px',
-            background: 'transparent',
-            border: 'none',
-            color: activeTab === 'feed' ? 'var(--text-main)' : 'var(--text-muted)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            borderBottom: activeTab === 'feed' ? '2px solid var(--primary)' : '2px solid transparent',
-            fontSize: '13px',
-            position: 'relative'
-          }}
         >
           <i className="fa-solid fa-square-rss"></i> Feed
           {unreadNotifCount > 0 && (
-            <span style={{
-              position: 'absolute',
-              top: '6px',
-              right: '6px',
-              background: 'var(--primary)',
-              color: 'white',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              borderRadius: '50%',
-              width: '16px',
-              height: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+            <span className="tab-btn-badge primary-badge">
               {unreadNotifCount}
             </span>
           )}
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'conversations' ? 'active' : ''}`} 
+        <button
+          className={`tab-btn ${activeTab === 'conversations' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('conversations');
             navigate('/chat');
           }}
-          style={{
-            flex: 1,
-            padding: '12px',
-            background: 'transparent',
-            border: 'none',
-            color: activeTab === 'conversations' ? 'var(--text-main)' : 'var(--text-muted)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            borderBottom: activeTab === 'conversations' ? '2px solid var(--primary)' : '2px solid transparent',
-            fontSize: '13px'
-          }}
         >
           <i className="fa-solid fa-message"></i> Chats
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`} 
+        <button
+          className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('users');
-            navigate('/chat');
-          }}
-          style={{
-            flex: 1,
-            padding: '12px',
-            background: 'transparent',
-            border: 'none',
-            color: activeTab === 'users' ? 'var(--text-main)' : 'var(--text-muted)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            borderBottom: activeTab === 'users' ? '2px solid var(--primary)' : '2px solid transparent',
-            fontSize: '13px'
+            navigate('/friends');
           }}
         >
-          <i className="fa-solid fa-users"></i> Users
+          <i className="fa-solid fa-users"></i> Friends
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`} 
+        <button
+          className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('requests');
-            navigate('/chat');
-          }}
-          style={{
-            flex: 1,
-            padding: '12px',
-            background: 'transparent',
-            border: 'none',
-            color: activeTab === 'requests' ? 'var(--text-main)' : 'var(--text-muted)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            borderBottom: activeTab === 'requests' ? '2px solid var(--primary)' : '2px solid transparent',
-            fontSize: '13px',
-            position: 'relative'
+            navigate('/friends/requests');
           }}
         >
           <i className="fa-solid fa-user-plus"></i> Requests
           {friendRequests.length > 0 && (
-            <span style={{
-              position: 'absolute',
-              top: '6px',
-              right: '6px',
-              background: 'var(--error)',
-              color: 'white',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              borderRadius: '50%',
-              width: '16px',
-              height: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+            <span className="tab-btn-badge error-badge">
               {friendRequests.length}
             </span>
           )}
@@ -250,12 +157,12 @@ export function Sidebar() {
               const hasBadge = unreadBadges[c.id] > 0;
 
               return (
-                <div 
-                  key={c.id} 
+                <div
+                  key={c.id}
                   className={`conv-item ${isActive ? 'active' : ''}`}
                   onClick={() => selectConversation(c.id, displayName, otherUserId)}
                 >
-                  <div 
+                  <div
                     className="avatar"
                     onClick={(e) => {
                       if (!c.is_group && otherUserId) {
@@ -330,9 +237,9 @@ export function Sidebar() {
               </button>
             </form>
             {addResultMsg && (
-              <div style={{ 
-                marginTop: '8px', 
-                fontSize: '11px', 
+              <div style={{
+                marginTop: '8px',
+                fontSize: '11px',
                 color: addResultMsg.isError ? 'var(--error)' : 'var(--success)',
                 fontWeight: 500
               }}>
@@ -348,12 +255,12 @@ export function Sidebar() {
               </div>
             ) : (
               users.map((u) => (
-                <div 
-                  key={u.id} 
+                <div
+                  key={u.id}
                   className="conv-item"
                   onClick={() => startChatWithUser(u.id, u.username)}
                 >
-                  <div 
+                  <div
                     className="avatar"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -386,13 +293,13 @@ export function Sidebar() {
             </div>
           ) : (
             friendRequests.map((req) => (
-              <div 
-                key={req.sender_id} 
+              <div
+                key={req.sender_id}
                 className="conv-item"
                 style={{ cursor: 'default', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden', flexGrow: 1 }}>
-                  <div 
+                  <div
                     className="avatar"
                     onClick={() => navigate(`/profile/${req.sender_id}`)}
                     style={{ cursor: 'pointer' }}

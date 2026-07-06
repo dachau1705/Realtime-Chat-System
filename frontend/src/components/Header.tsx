@@ -119,10 +119,12 @@ export function Header() {
   return (
     <header className="shared-glass-header">
       <div className="header-logo-section" onClick={() => navigate('/')}>
-        <div className="header-logo-icon">
-          <i className="fa-solid fa-cloud" />
-        </div>
-        <span className="header-logo-title">Antigravity</span>
+        <img 
+          src={theme === 'light' ? '/logo/connectly-logo-light.jpg' : '/logo/connectly-logo-dark.jpg'} 
+          alt="Logo" 
+          className="header-logo-img" 
+        />
+        <span className="header-logo-title">Connectly</span>
       </div>
 
       {/* 2. Debounced User Search Engine */}

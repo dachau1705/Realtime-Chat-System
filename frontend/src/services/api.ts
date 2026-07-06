@@ -595,8 +595,8 @@ export async function fetchFollowStatus(token: string, userId: string): Promise<
 /**
  * Fetches friend suggestions for current user.
  */
-export async function fetchSuggestions(token: string): Promise<UserSuggestion[]> {
-  const res = await fetch('/api/friends/suggestions', {
+export async function fetchSuggestions(token: string): Promise<any[]> {
+  const res = await fetch('/api/users/suggestions', {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   const data = await res.json();
