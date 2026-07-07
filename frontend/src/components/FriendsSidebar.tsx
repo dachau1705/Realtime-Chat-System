@@ -8,7 +8,7 @@ interface FriendsSidebarProps {
 }
 
 export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: FriendsSidebarProps) {
-  const { friendRequests, acceptRequest, declineRequest } = useChat();
+  const { friendRequests, sentRequests, acceptRequest, declineRequest } = useChat();
   const navigate = useNavigate();
 
   if (activeTab === 'requests') {
@@ -28,86 +28,153 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
               Friend Requests
             </h2>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              {friendRequests.length} request{friendRequests.length !== 1 ? 's' : ''} pending
+              {friendRequests.length} pending • {sentRequests.length} sent
             </span>
           </div>
         </div>
 
-        <div className="conv-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', overflowY: 'auto', flexGrow: 1 }}>
-          {friendRequests.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', marginTop: '40px', padding: '20px' }}>
-              <i className="fa-solid fa-user-clock" style={{ fontSize: '32px', marginBottom: '12px', display: 'block', opacity: 0.4 }}></i>
-              No pending requests
-            </div>
-          ) : (
-            friendRequests.map((req) => {
-              const isSelected = selectedRequestId === req.sender_id;
-              return (
-                <div 
-                  key={req.sender_id} 
-                  onClick={() => navigate(`/friends/requests/${req.sender_id}`)}
-                  style={{ 
-                    background: isSelected ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255, 255, 255, 0.02)', 
-                    padding: '14px', 
-                    borderRadius: '16px', 
-                    border: isSelected ? '1px solid var(--primary)' : '1px solid var(--panel-border)', 
-                    cursor: 'pointer', 
-                    display: 'flex', 
-                    gap: '12px', 
-                    flexDirection: 'column',
-                    transition: 'all 0.2s ease'
-                  }}
-                  className="friend-request-sidebar-item"
-                >
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    {req.sender_avatar_url ? (
-                      <img src={req.sender_avatar_url} alt="avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px' }}>
-                        {req.sender_username.charAt(0).toUpperCase()}
+        <div className="conv-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', overflowY: 'auto', flexGrow: 1 }}>
+          {/* Received Requests Section */}
+          <div>
+            <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+              Received ({friendRequests.length})
+            </h3>
+            {friendRequests.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', padding: '8px 0', textAlign: 'center' }}>
+                No received requests
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {friendRequests.map((req) => {
+                  const isSelected = selectedRequestId === req.sender_id;
+                  return (
+                    <div 
+                      key={req.sender_id} 
+                      onClick={() => navigate(`/friends/requests/${req.sender_id}`)}
+                      style={{ 
+                        background: isSelected ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255, 255, 255, 0.02)', 
+                        padding: '12px', 
+                        borderRadius: '12px', 
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--panel-border)', 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        gap: '10px', 
+                        flexDirection: 'column',
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="friend-request-sidebar-item"
+                    >
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        {req.sender_avatar_url ? (
+                          <img src={req.sender_avatar_url} alt="avatar" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <div className="avatar" style={{ width: '32px', height: '32px', fontSize: '12px' }}>
+                            {req.sender_username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div style={{ minWidth: 0, flexGrow: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '12.5px', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {req.sender_username}
+                          </div>
+                          <div style={{ fontSize: '9px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+                            {req.sender_email}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    <div style={{ minWidth: 0, flexGrow: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {req.sender_username}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <i className="fa-solid fa-user-group" style={{ fontSize: '9px', color: 'var(--primary)' }}></i>
-                        <span>{((req.sender_username.charCodeAt(0) + req.sender_username.length) % 5) + 1} mutual friends</span>
-                      </div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
-                        {req.sender_email}
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            acceptRequest(req.sender_id); 
+                            if (isSelected) navigate('/friends/requests');
+                          }} 
+                          style={{ flex: 1, padding: '6px 0', fontSize: '11px', fontWeight: 600, borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer' }}
+                        >
+                          Confirm
+                        </button>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            declineRequest(req.sender_id); 
+                            if (isSelected) navigate('/friends/requests');
+                          }} 
+                          style={{ flex: 1, padding: '6px 0', fontSize: '11px', fontWeight: 600, borderRadius: '8px', border: '1px solid var(--panel-border)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', cursor: 'pointer' }}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        acceptRequest(req.sender_id); 
-                        if (isSelected) navigate('/friends/requests');
-                      }} 
-                      style={{ flex: 1, padding: '8px 0', fontSize: '11.5px', fontWeight: 600, borderRadius: '10px', border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer', transition: 'background 0.2s' }}
-                      className="friends-action-btn-primary"
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Sent Requests Section */}
+          <div style={{ marginTop: '12px' }}>
+            <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+              Sent ({sentRequests.length})
+            </h3>
+            {sentRequests.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', padding: '8px 0', textAlign: 'center' }}>
+                No sent requests
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {sentRequests.map((req) => {
+                  const isSelected = selectedRequestId === req.receiver_id;
+                  return (
+                    <div 
+                      key={req.receiver_id} 
+                      onClick={() => navigate(`/friends/requests/${req.receiver_id}`)}
+                      style={{ 
+                        background: isSelected ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255, 255, 255, 0.02)', 
+                        padding: '12px', 
+                        borderRadius: '12px', 
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--panel-border)', 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        gap: '10px', 
+                        flexDirection: 'column',
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="friend-request-sidebar-item"
                     >
-                      Confirm
-                    </button>
-                    <button 
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        declineRequest(req.sender_id); 
-                        if (isSelected) navigate('/friends/requests');
-                      }} 
-                      style={{ flex: 1, padding: '8px 0', fontSize: '11.5px', fontWeight: 600, borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', cursor: 'pointer', transition: 'background 0.2s' }}
-                      className="friends-action-btn-secondary"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        {req.receiver_avatar_url ? (
+                          <img src={req.receiver_avatar_url} alt="avatar" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <div className="avatar" style={{ width: '32px', height: '32px', fontSize: '12px' }}>
+                            {req.receiver_username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div style={{ minWidth: 0, flexGrow: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '12.5px', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {req.receiver_username}
+                          </div>
+                          <div style={{ fontSize: '9px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+                            {req.receiver_email}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            declineRequest(req.receiver_id); 
+                            if (isSelected) navigate('/friends/requests');
+                          }} 
+                          style={{ flex: 1, padding: '6px 0', fontSize: '11px', fontWeight: 600, borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.08)', color: '#EF4444', cursor: 'pointer' }}
+                        >
+                          Cancel Request
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

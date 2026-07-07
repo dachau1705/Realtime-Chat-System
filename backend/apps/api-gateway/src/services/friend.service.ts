@@ -74,6 +74,10 @@ export async function getPendingRequests(userId: string) {
   return await friendRepo.getPendingRequests(userId);
 }
 
+export async function getSentRequests(userId: string) {
+  return await friendRepo.getSentRequests(userId);
+}
+
 export async function acceptFriendRequest(currentUserId: string, currentUsername: string, senderId: string) {
   const friendship = await friendRepo.acceptFriendshipRequest(senderId, currentUserId);
   if (!friendship) {

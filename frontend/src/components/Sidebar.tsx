@@ -247,7 +247,20 @@ export function Sidebar() {
                       )}
                     </div>
                     <div className="conv-preview" style={{ color: hasBadge ? 'var(--text-main)' : 'var(--text-muted)', fontWeight: hasBadge ? 'bold' : 'normal' }}>
-                      Click to view messages
+                      {(() => {
+                        if (!c.last_message_content) return 'No messages yet';
+                        const prefix = c.last_message_sender_id === currentUser?.id
+                          ? 'You: '
+                          : (c.is_group ? `${c.last_message_sender_username}: ` : '');
+                        
+                        if (c.last_message_type === 'image') {
+                          return `${prefix}📷 Image`;
+                        }
+                        if (c.last_message_type === 'sticker') {
+                          return `${prefix}🎬 Sticker`;
+                        }
+                        return `${prefix}${c.last_message_content}`;
+                      })()}
                     </div>
                   </div>
                 </div>

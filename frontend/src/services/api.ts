@@ -20,6 +20,13 @@ export interface Conversation {
   member_avatar_urls?: string[];
   member_full_names?: string[];
   created_at: string;
+  last_message_content?: string | null;
+  last_message?: string | null;
+  last_message_type?: 'text' | 'image' | 'sticker' | null;
+  last_message_sender_id?: string | null;
+  last_message_sender_username?: string | null;
+  last_message_created_at?: string | null;
+  last_message_time?: string | null;
 }
 
 export interface Message {
@@ -50,6 +57,14 @@ export interface FriendRequest {
   sender_username: string;
   sender_email: string;
   sender_avatar_url?: string;
+  created_at: string;
+}
+
+export interface SentFriendRequest {
+  receiver_id: string;
+  receiver_username: string;
+  receiver_email: string;
+  receiver_avatar_url?: string;
   created_at: string;
 }
 
@@ -294,6 +309,17 @@ export async function fetchFriendRequests(_token: string): Promise<FriendRequest
 }
 
 /**
+ * Fetches pending friend requests sent by the current user.
+ */
+export async function fetchSentRequests(_token: string): Promise<SentFriendRequest[]> {
+  const res = await getData('/friends/requests/sent');
+  if (res.data && res.data.status === false) {
+    throw new Error(res.data.mess || 'Failed to load sent friend requests');
+  }
+  return res.data;
+}
+
+/**
  * Accepts a friend request.
  */
 export async function acceptFriendRequest(_token: string, senderId: string): Promise<{ message: string }> {
@@ -532,7 +558,7 @@ export async function fetchFollowStatus(_token: string, userId: string): Promise
  * Fetches friend suggestions for current user.
  */
 export async function fetchSuggestions(_token: string): Promise<any[]> {
-  const res = await getData('/users/suggestions');
+  const res = await getData('/friends/suggestions');
   if (res.data && res.data.status === false) {
     throw new Error(res.data.mess || 'Failed to load suggestions');
   }

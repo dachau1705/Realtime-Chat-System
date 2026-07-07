@@ -33,6 +33,17 @@ export async function getPending(req: AuthenticatedRequest, res: Response) {
   }
 }
 
+export async function getSentRequests(req: AuthenticatedRequest, res: Response) {
+  const currentUserId = req.user!.userId;
+  try {
+    const result = await friendService.getSentRequests(currentUserId);
+    res.json(result);
+  } catch (err) {
+    logger.error('Failed to fetch sent friend requests', { error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
+  }
+}
+
 export async function accept(req: AuthenticatedRequest, res: Response) {
   const { senderId } = req.body;
   const currentUserId = req.user!.userId;

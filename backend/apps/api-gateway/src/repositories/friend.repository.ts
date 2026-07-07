@@ -51,6 +51,18 @@ export async function getPendingRequests(userId: string) {
   return result.rows;
 }
 
+export async function getSentRequests(userId: string) {
+  const result = await dbPool.query(
+    `SELECT f.user_id_2 as receiver_id, u.username as receiver_username, u.email as receiver_email, u.avatar_url as receiver_avatar_url, f.created_at
+     FROM friendships f
+     JOIN users u ON f.user_id_2 = u.id
+     WHERE f.user_id_1 = $1 AND f.status = 'pending'
+     ORDER BY f.created_at DESC`,
+    [userId]
+  );
+  return result.rows;
+}
+
 export async function getFriendsList(targetUserId: string, currentUserId: string) {
   const result = await dbPool.query(
     `SELECT u.id, u.username, u.full_name, u.avatar_url, u.email,

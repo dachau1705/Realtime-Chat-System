@@ -7,17 +7,19 @@ import type {
   Conversation,
   Message,
   FriendRequest,
-  Notification
+  Notification,
+  SentFriendRequest
 } from '../services/api';
 import { markConversationAsReadApi } from '../utils/api';
 import {
   fetchConversations as apiFetchConversations,
-  fetchUsers as apiFetchUsers,
+  fetchUserFriends as apiFetchUserFriends,
   createConversation as apiCreateConversation,
   createGroupConversation as apiCreateGroupConversation,
   fetchChatHistory as apiFetchChatHistory,
   addFriendByEmail as apiAddFriendByEmail,
   fetchFriendRequests as apiFetchFriendRequests,
+  fetchSentRequests as apiFetchSentRequests,
   acceptFriendRequest as apiAcceptFriendRequest,
   declineFriendRequest as apiDeclineFriendRequest,
   fetchNotifications as apiFetchNotifications,
@@ -35,6 +37,7 @@ interface ChatContextType {
   users: User[];
   messages: Message[];
   friendRequests: FriendRequest[];
+  sentRequests: SentFriendRequest[];
   notifications: Notification[];
   unreadNotifCount: number;
   toasts: Array<{ id: string; title: string; message: string; isError?: boolean }>;
@@ -80,6 +83,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [sentRequests, setSentRequests] = useState<SentFriendRequest[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
   const [toasts, setToasts] = useState<Array<{ id: string; title: string; message: string; isError?: boolean }>>([]);
@@ -162,7 +166,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const target = prev.find(c => c.id === msg.conversation_id);
         const filtered = prev.filter(c => c.id !== msg.conversation_id);
         if (target) {
-          return [target, ...filtered];
+          const updated = {
+            ...target,
+            last_message_content: msg.content,
+            last_message: msg.content,
+            last_message_type: msg.type || 'text',
+            last_message_sender_id: msg.sender_id,
+            last_message_sender_username: msg.sender_username,
+            last_message_created_at: msg.created_at,
+            last_message_time: msg.created_at
+          };
+          return [updated, ...filtered];
         }
         return prev;
       });
@@ -371,13 +385,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (token) {
+    if (token && currentUser) {
       loadConversations();
       loadUserList();
       loadRequests();
       loadNotifications();
     }
-  }, [token]);
+  }, [token, currentUser]);
 
   // Re-flush buffered retry queue when connectivity status turns online
   useEffect(() => {
@@ -483,10 +497,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Load user directory
   const loadUserList = async () => {
-    if (!token) return;
+    if (!token || !currentUserRef.current) return;
     try {
-      const userList = await apiFetchUsers(token);
-      setUsers(userList);
+      const userList = await apiFetchUserFriends(token, currentUserRef.current.id);
+      const formattedUsers: User[] = userList.map(u => ({
+        id: u.id,
+        username: u.username,
+        email: u.email || '',
+        full_name: u.full_name,
+        avatar_url: u.avatar_url,
+        bio: u.bio
+      }));
+      setUsers(formattedUsers);
     } catch (err: any) {
       logEvent('info', 'LOAD_USERS_FAILED', err.message);
     }
@@ -497,6 +519,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       const result = await apiAddFriendByEmail(token, email);
       await loadUserList(); // refresh the users list
+      await loadRequests(); // refresh friend requests (including sent)
       return result.message;
     } catch (err: any) {
       logEvent('info', 'ADD_FRIEND_FAILED', err.message);
@@ -507,8 +530,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const loadRequests = async () => {
     if (!token) return;
     try {
-      const requestList = await apiFetchFriendRequests(token);
-      setFriendRequests(requestList);
+      const [receivedList, sentList] = await Promise.all([
+        apiFetchFriendRequests(token),
+        apiFetchSentRequests(token)
+      ]);
+      setFriendRequests(receivedList);
+      setSentRequests(sentList);
     } catch (err: any) {
       logEvent('info', 'LOAD_REQUESTS_FAILED', err.message);
     }
@@ -664,6 +691,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConversations([]);
     setUsers([]);
     setMessages([]);
+    setFriendRequests([]);
+    setSentRequests([]);
     setSocketConnected(false);
     setTypingStatusText('');
     setPendingQueue([]);
@@ -680,6 +709,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       users,
       messages,
       friendRequests,
+      sentRequests,
       notifications,
       unreadNotifCount,
       toasts,

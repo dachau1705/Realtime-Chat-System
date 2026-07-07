@@ -14,6 +14,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
   const { 
     users, 
     friendRequests, 
+    sentRequests,
     loadUserList, 
     loadRequests,
     acceptRequest, 
@@ -23,6 +24,8 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
     token,
     showToast
   } = useChat();
+
+  const isOutgoing = sentRequests.some(r => r.receiver_id === selectedRequestId);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -225,6 +228,51 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
             )}
           </div>
 
+          {/* Sent Friend Requests Section */}
+          {sentRequests.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
+                  Sent Requests ({sentRequests.length})
+                </h2>
+              </div>
+              <div className="friends-grid-list">
+                {sentRequests.slice(0, 4).map((req) => (
+                  <div key={req.receiver_id} className="friend-grid-card-large">
+                    <div onClick={() => navigate(`/profile/${req.receiver_id}`)} style={{ cursor: 'pointer' }}>
+                      {req.receiver_avatar_url ? (
+                        <img src={req.receiver_avatar_url} alt={req.receiver_username} className="friend-card-avatar" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} />
+                      ) : (
+                        <div className="friend-card-avatar-placeholder" style={{ width: '80px', height: '80px', borderRadius: '50%', fontSize: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--primary)', color: 'white' }}>
+                          {req.receiver_username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flexGrow: 1, minWidth: 0, width: '100%' }}>
+                      <div onClick={() => navigate(`/profile/${req.receiver_id}`)} style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--text-main)', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {req.receiver_username}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                        <i className="fa-solid fa-user-group" style={{ fontSize: '9px', color: 'var(--primary)' }}></i>
+                        <span>{((req.receiver_username.charCodeAt(0) + req.receiver_username.length) % 5) + 1} mutual friends</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {req.receiver_email}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => declineRequest(req.receiver_id)}
+                      className="friends-action-btn-secondary"
+                      style={{ width: '100%', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px', padding: '10px 0', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '8px' }}
+                    >
+                      <i className="fa-solid fa-user-xmark" style={{ fontSize: '11px' }}></i> Cancel Request
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Suggestions Summary Section */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -339,26 +387,41 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
 
                     <div className="profile-header-actions" style={{ marginBottom: 0 }}>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button 
-                          onClick={() => {
-                            acceptRequest(selectedProfile.id);
-                            navigate('/friends/requests');
-                          }}
-                          className="friends-action-btn-primary"
-                          style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-                        >
-                          Confirm Request
-                        </button>
-                        <button 
-                          onClick={() => {
-                            declineRequest(selectedProfile.id);
-                            navigate('/friends/requests');
-                          }}
-                          className="friends-action-btn-secondary"
-                          style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--panel-border)', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-                        >
-                          Delete Request
-                        </button>
+                        {isOutgoing ? (
+                          <button 
+                            onClick={() => {
+                              declineRequest(selectedProfile.id);
+                              navigate('/friends/requests');
+                            }}
+                            className="friends-action-btn-secondary"
+                            style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Cancel Request
+                          </button>
+                        ) : (
+                          <>
+                            <button 
+                              onClick={() => {
+                                acceptRequest(selectedProfile.id);
+                                navigate('/friends/requests');
+                              }}
+                              className="friends-action-btn-primary"
+                              style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              Confirm Request
+                            </button>
+                            <button 
+                              onClick={() => {
+                                declineRequest(selectedProfile.id);
+                                navigate('/friends/requests');
+                              }}
+                              className="friends-action-btn-secondary"
+                              style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--panel-border)', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              Delete Request
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

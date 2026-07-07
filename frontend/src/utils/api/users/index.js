@@ -4,7 +4,7 @@ import { getData, postData, putData } from '../../../lib/request';
 // API Endpoints
 export const getUsersApi = (params) => getData('/users', params);
 export const getUserProfileApi = (userId, params) => getData(`/users/${userId}`, params);
-export const getSuggestionsApi = (params) => getData('/users/suggestions', params);
+export const getSuggestionsApi = (params) => getData('/friends/suggestions', params);
 export const searchUsersApi = (query, params) => getData('/search/users', { q: query, ...params });
 export const updateUserProfileApi = (userId, data) => putData(`/users/${userId}`, data);
 export const uploadAvatarApi = (file) => postData('/upload/avatar', { file }, { isFormData: true });

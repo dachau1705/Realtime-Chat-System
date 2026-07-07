@@ -8,6 +8,7 @@ import fs from 'fs';
 import { initKafka } from './config/services';
 
 const app = express();
+app.disable('etag');
 app.use(cors());
 app.use(express.json());
 

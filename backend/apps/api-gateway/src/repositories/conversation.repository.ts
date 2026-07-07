@@ -3,17 +3,34 @@ import { dbPool } from '@libs/common';
 export async function getUserConversations(userId: string) {
   const result = await dbPool.query(
     `SELECT c.id, c.name, c.is_group, c.avatar_url, c.created_at,
-            COALESCE(array_agg(u.username) FILTER (WHERE u.id != $1), '{}') as member_usernames,
-            COALESCE(array_agg(u.id) FILTER (WHERE u.id != $1), '{}') as member_ids,
-            COALESCE(array_agg(u.avatar_url) FILTER (WHERE u.id != $1), '{}') as member_avatar_urls,
-            COALESCE(array_agg(u.full_name) FILTER (WHERE u.id != $1), '{}') as member_full_names
+            COALESCE(array_agg(distinct u.username) FILTER (WHERE u.id != $1), '{}') as member_usernames,
+            COALESCE(array_agg(distinct u.id) FILTER (WHERE u.id != $1), '{}') as member_ids,
+            COALESCE(array_agg(distinct u.avatar_url) FILTER (WHERE u.id != $1), '{}') as member_avatar_urls,
+            COALESCE(array_agg(distinct u.full_name) FILTER (WHERE u.id != $1), '{}') as member_full_names,
+            lm.content as last_message_content,
+            lm.content as last_message,
+            lm.type as last_message_type,
+            lm.sender_id as last_message_sender_id,
+            lm.sender_username as last_message_sender_username,
+            lm.created_at as last_message_created_at,
+            lm.created_at as last_message_time
      FROM conversations c
      JOIN conversation_members cm ON c.id = cm.conversation_id
      JOIN users u ON cm.user_id = u.id
+     LEFT JOIN LATERAL (
+       SELECT m.content, m.type, m.sender_id, m.created_at, mu.username as sender_username
+       FROM messages m
+       JOIN users mu ON m.sender_id = mu.id
+       WHERE m.conversation_id = c.id
+       ORDER BY m.created_at DESC, m.id DESC
+       LIMIT 1
+     ) lm ON true
      WHERE c.id IN (
        SELECT conversation_id FROM conversation_members WHERE user_id = $1
      )
-     GROUP BY c.id, c.name, c.is_group, c.avatar_url, c.created_at`,
+     GROUP BY c.id, c.name, c.is_group, c.avatar_url, c.created_at,
+              lm.content, lm.type, lm.sender_id, lm.sender_username, lm.created_at
+     ORDER BY COALESCE(lm.created_at, c.created_at) DESC`,
     [userId]
   );
   return result.rows;

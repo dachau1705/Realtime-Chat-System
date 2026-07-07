@@ -234,7 +234,9 @@ export function Header() {
                         }}
                       >
                         <div className="avatar" style={{ width: '36px', height: '36px', flexShrink: 0 }}>
-                          {!c.is_group && c.member_avatar_urls?.[0] ? (
+                          {c.is_group && c.avatar_url ? (
+                            <img src={c.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                          ) : !c.is_group && c.member_avatar_urls?.[0] ? (
                             <img src={c.member_avatar_urls[0]} alt={displayName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                           ) : (
                             displayName.charAt(0).toUpperCase()
@@ -277,7 +279,20 @@ export function Header() {
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
                           }}>
-                            {hasBadge ? 'New messages' : 'Click to view conversation'}
+                            {(() => {
+                              if (!c.last_message_content) return 'No messages yet';
+                              const prefix = c.last_message_sender_id === currentUser?.id
+                                ? 'You: '
+                                : (c.is_group ? `${c.last_message_sender_username}: ` : '');
+                              
+                              if (c.last_message_type === 'image') {
+                                return `${prefix}📷 Image`;
+                              }
+                              if (c.last_message_type === 'sticker') {
+                                return `${prefix}🎬 Sticker`;
+                              }
+                              return `${prefix}${c.last_message_content}`;
+                            })()}
                           </div>
                         </div>
                       </div>
