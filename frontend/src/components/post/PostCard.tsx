@@ -211,8 +211,16 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
             >
               {post.full_name || post.username}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              @{post.username} • {formatTime(post.created_at)}
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>@{post.username}</span>
+              <span>•</span>
+              <span>{formatTime(post.created_at)}</span>
+              <span>•</span>
+              {post.visibility === 'public' && <i className="fa-solid fa-earth-americas" title="Public" style={{ fontSize: '10px' }} />}
+              {post.visibility === 'friends' && <i className="fa-solid fa-user-group" title="Friends" style={{ fontSize: '10px' }} />}
+              {post.visibility === 'specific_friends' && <i className="fa-solid fa-user-check" title="Specific Friends" style={{ fontSize: '10px' }} />}
+              {post.visibility === 'except_friends' && <i className="fa-solid fa-user-slash" title="Friends Except" style={{ fontSize: '10px' }} />}
+              {post.visibility === 'only_me' && <i className="fa-solid fa-lock" title="Only Me" style={{ fontSize: '10px' }} />}
             </div>
           </div>
         </div>
@@ -422,7 +430,8 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
     prevProps.post.media_urls.join(',') === nextProps.post.media_urls.join(',') &&
     prevProps.post.avatar_url === nextProps.post.avatar_url &&
     prevProps.post.username === nextProps.post.username &&
-    prevProps.post.full_name === nextProps.post.full_name
+    prevProps.post.full_name === nextProps.post.full_name &&
+    prevProps.post.visibility === nextProps.post.visibility
   );
 });
 

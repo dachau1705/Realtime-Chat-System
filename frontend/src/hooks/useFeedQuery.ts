@@ -80,8 +80,20 @@ export function useCreatePostMutation(token: string, currentUser: any) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ content, mediaUrls }: { content: string; mediaUrls: string[] }) =>
-      createPost(token, content, mediaUrls),
+    mutationFn: ({ 
+      content, 
+      mediaUrls, 
+      visibility, 
+      allowedUserIds, 
+      blockedUserIds 
+    }: { 
+      content: string; 
+      mediaUrls: string[]; 
+      visibility?: string; 
+      allowedUserIds?: string[]; 
+      blockedUserIds?: string[]; 
+    }) =>
+      createPost(token, content, mediaUrls, visibility, allowedUserIds, blockedUserIds),
 
     onMutate: async ({ content, mediaUrls }) => {
       await queryClient.cancelQueries({ queryKey: ['feed'] });

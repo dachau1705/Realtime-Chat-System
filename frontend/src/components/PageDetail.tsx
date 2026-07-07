@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
+import {
+  useGetPageDetail,
+  useGetPagePosts,
+  useGetPageMembers,
+  useGetPageReviews,
+  useGetPageSettings,
+  useGetPageInsights,
+  followPageApi,
+  unfollowPageApi,
+  createPagePostApi,
+  managePageMembersApi,
+  deletePageMemberApi,
+  createPageReviewApi,
+  updatePageSettingsApi
+} from '../utils/api';
 
 interface PageProfile {
   id: string;
@@ -82,18 +97,28 @@ export function PageDetail() {
   const navigate = useNavigate();
   const { token, showToast } = useChat();
 
-  const [page, setPage] = useState<PageProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const page = useGetPageDetail(id, { refresh: refreshTrigger, enabled: !!token }) as any as PageProfile | null;
+  const loading = !page;
 
   // Tabs: posts, about, members, settings, reviews, insights
   const [activeTab, setActiveTab] = useState<'posts' | 'about' | 'members' | 'settings' | 'reviews' | 'insights'>('posts');
 
-  // Tab Data
-  const [posts, setPosts] = useState<PagePost[]>([]);
-  const [members, setMembers] = useState<PageMember[]>([]);
-  const [reviews, setReviews] = useState<PageReview[]>([]);
+  // Tab Data hooks
+  const posts = useGetPagePosts(id, { refresh: refreshTrigger, enabled: !!token && activeTab === 'posts' }) as any as PagePost[];
+  const members = useGetPageMembers(id, { refresh: refreshTrigger, enabled: !!token && activeTab === 'members' }) as any as PageMember[];
+  const reviews = useGetPageReviews(id, { refresh: refreshTrigger, enabled: !!token && activeTab === 'reviews' }) as any as PageReview[];
+  const settingsData = useGetPageSettings(id, { refresh: refreshTrigger, enabled: !!token && activeTab === 'settings' }) as any as PageSettings | null;
+  const insights = useGetPageInsights(id, { refresh: refreshTrigger, enabled: !!token && activeTab === 'insights' }) as any as PageInsights | null;
+
   const [settings, setSettings] = useState<PageSettings | null>(null);
-  const [insights, setInsights] = useState<PageInsights | null>(null);
+
+  useEffect(() => {
+    if (settingsData) {
+      setSettings(settingsData);
+    }
+  }, [settingsData]);
 
   // Action Inputs
   const [newPostContent, setNewPostContent] = useState('');
@@ -105,74 +130,13 @@ export function PageDetail() {
   // Loading States
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchPageProfile = async () => {
-    if (!token || !id) return;
-    try {
-      const res = await fetch(`/api/pages/detail/${id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPage(data);
-      } else {
-        showToast('Error', 'Failed to retrieve page profile.', true);
-      }
-    } catch (err) {
-      console.error('Failed to load page detail', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchPageProfile();
-  }, [id, token]);
-
-  // Load active tab data
-  useEffect(() => {
-    if (!token || !id || !page) return;
-
-    if (activeTab === 'posts') {
-      fetch(`/api/pages/${id}/posts`, { headers: { 'Authorization': `Bearer ${token}` } })
-        .then(res => res.json())
-        .then(data => setPosts(data))
-        .catch(err => console.error(err));
-    } else if (activeTab === 'members') {
-      fetch(`/api/pages/${id}/members`, { headers: { 'Authorization': `Bearer ${token}` } })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setMembers(data);
-        })
-        .catch(err => console.error(err));
-    } else if (activeTab === 'reviews') {
-      fetch(`/api/pages/${id}/reviews`, { headers: { 'Authorization': `Bearer ${token}` } })
-        .then(res => res.json())
-        .then(data => setReviews(data))
-        .catch(err => console.error(err));
-    } else if (activeTab === 'settings') {
-      fetch(`/api/pages/${id}/settings`, { headers: { 'Authorization': `Bearer ${token}` } })
-        .then(res => res.json())
-        .then(data => setSettings(data))
-        .catch(err => console.error(err));
-    } else if (activeTab === 'insights') {
-      fetch(`/api/pages/${id}/insights`, { headers: { 'Authorization': `Bearer ${token}` } })
-        .then(res => res.json())
-        .then(data => setInsights(data))
-        .catch(err => console.error(err));
-    }
-  }, [activeTab, id, token, page]);
-
   const handleFollowToggle = async () => {
     if (!token || !page) return;
-    const action = page.isFollowing ? 'unfollow' : 'follow';
     try {
-      const res = await fetch(`/api/pages/${page.id}/${action}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        showToast('Success', `Successfully ${action}ed page!`, false);
-        fetchPageProfile();
+      const res = page.isFollowing ? await unfollowPageApi(page.id) : await followPageApi(page.id);
+      if (res.data && res.data.status !== false) {
+        showToast('Success', `Successfully ${page.isFollowing ? 'unfollow' : 'follow'}ed page!`, false);
+        setRefreshTrigger(prev => prev + 1);
       }
     } catch (err) {
       console.error(err);
@@ -185,21 +149,11 @@ export function PageDetail() {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/pages/${id}/posts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ content: newPostContent.trim() })
-      });
-      if (res.ok) {
+      const res = await createPagePostApi(id, { content: newPostContent.trim() });
+      if (res.data && res.data.status !== false) {
         setNewPostContent('');
         showToast('Success', 'Post published to Page feed.', false);
-        // Refresh posts list
-        const postsRes = await fetch(`/api/pages/${id}/posts`, { headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await postsRes.json();
-        setPosts(data);
+        setRefreshTrigger(prev => prev + 1);
       } else {
         showToast('Failed', 'Could not submit post.', true);
       }
@@ -216,24 +170,13 @@ export function PageDetail() {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/pages/${id}/members`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ targetEmail: assignEmail.trim(), role: assignRole })
-      });
-      const data = await res.json();
-      if (res.ok) {
+      const res = await managePageMembersApi(id, { targetEmail: assignEmail.trim(), role: assignRole });
+      if (res.data && res.data.status !== false) {
         setAssignEmail('');
-        showToast('Success', data.message, false);
-        // Refresh members list
-        const membersRes = await fetch(`/api/pages/${id}/members`, { headers: { 'Authorization': `Bearer ${token}` } });
-        const list = await membersRes.json();
-        setMembers(list);
+        showToast('Success', res.data.message || 'Staff assigned successfully.', false);
+        setRefreshTrigger(prev => prev + 1);
       } else {
-        showToast('Assignment Failed', data.error || 'Failed to assign role.', true);
+        showToast('Assignment Failed', res.data?.mess || 'Failed to assign role.', true);
       }
     } catch (err) {
       console.error(err);
@@ -247,16 +190,12 @@ export function PageDetail() {
     if (!window.confirm('Are you sure you want to revoke this staff role?')) return;
 
     try {
-      const res = await fetch(`/api/pages/${id}/members/${userId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
+      const res = await deletePageMemberApi(id, userId);
+      if (res.data && res.data.status !== false) {
         showToast('Success', 'Staff access revoked.', false);
-        setMembers(prev => prev.filter(m => m.user_id !== userId));
+        setRefreshTrigger(prev => prev + 1);
       } else {
-        const errData = await res.json();
-        showToast('Revoke Failed', errData.error || 'Could not remove member.', true);
+        showToast('Revoke Failed', res.data?.mess || 'Could not remove member.', true);
       }
     } catch (err) {
       console.error(err);
@@ -269,22 +208,11 @@ export function PageDetail() {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/pages/${id}/reviews`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ rating: newRating, reviewText: newReviewText.trim() })
-      });
-      if (res.ok) {
+      const res = await createPageReviewApi(id, { rating: newRating, reviewText: newReviewText.trim() });
+      if (res.data && res.data.status !== false) {
         setNewReviewText('');
         showToast('Success', 'Thank you for your rating review!', false);
-        // Refresh reviews & average statistics
-        fetchPageProfile();
-        const reviewsRes = await fetch(`/api/pages/${id}/reviews`, { headers: { 'Authorization': `Bearer ${token}` } });
-        const list = await reviewsRes.json();
-        setReviews(list);
+        setRefreshTrigger(prev => prev + 1);
       }
     } catch (err) {
       console.error(err);
@@ -299,24 +227,18 @@ export function PageDetail() {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/pages/${id}/settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          allowVisitorPosts: settings.allow_visitor_posts,
-          allowTagging: settings.allow_tagging,
-          allowMentions: settings.allow_mentions,
-          profanityFilterLevel: settings.profanity_filter_level,
-          ageRestriction: settings.age_restriction,
-          autoReplyEnabled: settings.auto_reply_enabled,
-          autoReplyMessage: settings.auto_reply_message
-        })
+      const res = await updatePageSettingsApi(id, {
+        allowVisitorPosts: settings.allow_visitor_posts,
+        allowTagging: settings.allow_tagging,
+        allowMentions: settings.allow_mentions,
+        profanityFilterLevel: settings.profanity_filter_level,
+        ageRestriction: settings.age_restriction,
+        autoReplyEnabled: settings.auto_reply_enabled,
+        autoReplyMessage: settings.auto_reply_message
       });
-      if (res.ok) {
+      if (res.data && res.data.status !== false) {
         showToast('Success', 'Page settings saved successfully.', false);
+        setRefreshTrigger(prev => prev + 1);
       }
     } catch (err) {
       console.error(err);

@@ -5,7 +5,9 @@ import { uploadMedia } from '../services/api';
 export function ChatArea() {
   const {
     currentRoomId,
+    currentUser,
     otherUser,
+    conversations,
     messages,
     socketConnected,
     typingStatusText,
@@ -88,17 +90,34 @@ export function ChatArea() {
   };
 
   const hasRoom = !!currentRoomId;
+  const activeConv = conversations.find(c => c.id === currentRoomId);
+  const displayName = activeConv?.is_group
+    ? (activeConv.name || 'Group Chat')
+    : otherUser
+      ? `Chatting with ${otherUser.full_name || otherUser.username}`
+      : activeConv
+        ? (activeConv.member_full_names?.[0] || activeConv.member_usernames?.[0] || 'Conversation')
+        : 'Conversation';
+
+  const displayStatus = activeConv?.is_group
+    ? `Group Chat • ${activeConv.member_ids.length + 1} members`
+    : 'Direct Chat Session';
 
   return (
     <div className="chat-area">
       <div className="chat-header">
-        <div className="active-chat-info">
+        <div className="active-chat-info" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {activeConv?.is_group && activeConv.avatar_url && (
+            <div className="avatar" style={{ width: '38px', height: '38px', flexShrink: 0 }}>
+              <img src={activeConv.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            </div>
+          )}
           <div>
             <div className="active-chat-name" id="roomTitle">
-              {otherUser ? `Chatting with ${otherUser.username}` : 'Conversation'}
+              {displayName}
             </div>
             <div className="active-chat-status" id="roomStatus">
-              {otherUser ? 'Direct Chat Session' : 'Active Session'}
+              {displayStatus}
             </div>
           </div>
         </div>
@@ -126,7 +145,7 @@ export function ChatArea() {
           </div>
         ) : (
           messages.map((msg, index) => {
-            const isMe = msg.sender_id !== otherUser?.id;
+            const isMe = msg.sender_id === currentUser?.id;
             const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             let tickClass = '';
@@ -177,6 +196,17 @@ export function ChatArea() {
 
             return (
               <div key={msg.id || index} className={rowClass} id={`msg-row-${msg.id || msg.client_message_id}`}>
+                {!isMe && activeConv?.is_group && (
+                  <div style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: 'var(--text-muted)',
+                    marginBottom: '3px',
+                    marginLeft: '8px'
+                  }}>
+                    {msg.sender_full_name || msg.sender_username || 'Member'}
+                  </div>
+                )}
                 <div className={isSticker ? "msg-bubble-sticker" : "msg-bubble"}>
                   {renderMessageContent()}
                   <div className="msg-meta">

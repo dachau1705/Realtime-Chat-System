@@ -8,7 +8,6 @@ import { ProfileScreen } from './components/ProfileScreen';
 import { FeedPage } from './components/FeedPage';
 import { PostDetailPage } from './components/PostDetailPage';
 import { Header } from './components/Header';
-import { Footer } from './components/Footer';
 import PageCreationWizard from './components/PageCreationWizard';
 import { PageDetail } from './components/PageDetail';
 import { FriendsMainPage } from './components/FriendsMainPage';
@@ -82,7 +81,6 @@ export default function App() {
                 <Route path="/pages/:id" element={<PageDetail />} />
               </Routes>
             </div>
-            <Footer />
           </div>
         </div>
       )}

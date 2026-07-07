@@ -9,10 +9,12 @@ import type {
   FriendRequest,
   Notification
 } from '../services/api';
+import { markConversationAsReadApi } from '../utils/api';
 import {
   fetchConversations as apiFetchConversations,
   fetchUsers as apiFetchUsers,
   createConversation as apiCreateConversation,
+  createGroupConversation as apiCreateGroupConversation,
   fetchChatHistory as apiFetchChatHistory,
   addFriendByEmail as apiAddFriendByEmail,
   fetchFriendRequests as apiFetchFriendRequests,
@@ -50,6 +52,7 @@ interface ChatContextType {
   logout: () => void;
   selectConversation: (roomId: string, displayName: string, otherUserId: string) => Promise<void>;
   startChatWithUser: (otherUserId: string, otherUsername: string) => Promise<void>;
+  createGroupChat: (name: string, memberIds: string[], avatarUrl?: string) => Promise<Conversation | undefined>;
   loadConversations: () => Promise<void>;
   loadUserList: () => Promise<void>;
   addFriend: (email: string) => Promise<string>;
@@ -181,11 +184,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         // Send read receipt if we are not the sender
         if (msg.sender_id !== currentUserRef.current?.id) {
           logEvent('outgoing', 'READ_RECEIPT', { conversationId: msg.conversation_id, messageId: msg.id, status: 'seen' });
-          socketInstance.emit('read_receipt', {
-            conversationId: msg.conversation_id,
-            messageId: msg.id,
-            status: 'seen'
-          });
+          markConversationAsReadApi(msg.conversation_id).catch(err => console.error('Failed to mark read', err));
 
           // Show browser notification if tab is hidden/out of focus
           if (document.hidden) {
@@ -227,7 +226,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       logEvent('incoming', 'RECEIPT_RECEIVED', event);
       if (event.conversation_id === currentRoomIdRef.current) {
         setMessages(prev => prev.map(m => {
-          if (m.id === event.message_id) {
+          if (event.message_id === 'all') {
+            if (m.sender_id !== event.user_id) {
+              return { ...m, status: event.status };
+            }
+          } else if (m.id === event.message_id) {
             return { ...m, status: event.status };
           }
           return m;
@@ -369,6 +372,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (token) {
+      loadConversations();
+      loadUserList();
+      loadRequests();
       loadNotifications();
     }
   }, [token]);
@@ -589,6 +595,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       const history = await apiFetchChatHistory(token, roomId);
       setMessages(history);
+
+      // Call bulk read endpoint
+      markConversationAsReadApi(roomId).catch(err => console.error('Failed to mark conversation as read', err));
     } catch (err: any) {
       logEvent('info', 'HISTORY_SYNC_FAILED', 'Failed to load historical database logs. Operating in transient memory-only channel mode.');
     }
@@ -605,6 +614,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       await loadConversations();
     } catch (err: any) {
       logEvent('info', 'START_CHAT_FAILED', err.message);
+    }
+  };
+
+  const createGroupChat = async (name: string, memberIds: string[], avatarUrl?: string) => {
+    if (!token) return;
+    logEvent('info', 'CREATE_GROUP_INIT', { name, memberIds, avatarUrl });
+    try {
+      const conversation = await apiCreateGroupConversation(token, name, memberIds, avatarUrl);
+      setCurrentRoomId(conversation.id);
+      setOtherUser(null);
+      setActiveTab('conversations');
+      await loadConversations();
+      return conversation;
+    } catch (err: any) {
+      logEvent('info', 'CREATE_GROUP_FAILED', err.message);
+      showToast('Error', err.message || 'Failed to create group chat', true);
     }
   };
 
@@ -672,6 +697,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       logout,
       selectConversation,
       startChatWithUser,
+      createGroupChat,
       loadConversations,
       loadUserList,
       addFriend,

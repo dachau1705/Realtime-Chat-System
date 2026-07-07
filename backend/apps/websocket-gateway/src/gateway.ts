@@ -281,6 +281,10 @@ export async function bootstrapGateway() {
           // Note: PostgreSQL has a UNIQUE constraint on client_message_id, so DB-level deduplication still works!
         }
 
+        // Fetch sender details
+        const senderRes = await dbPool.query('SELECT username, full_name FROM users WHERE id = $1', [userId]);
+        const senderUser = senderRes.rows[0] || { username, full_name: null };
+
         // Build message payload
         const msgPayload = {
           id: serverMessageId,
@@ -290,7 +294,9 @@ export async function bootstrapGateway() {
           client_message_id: clientMessageId,
           type,
           media_url: mediaUrl || null,
-          created_at: new Date()
+          created_at: new Date(),
+          sender_username: senderUser.username,
+          sender_full_name: senderUser.full_name
         };
 
         let processed = false;

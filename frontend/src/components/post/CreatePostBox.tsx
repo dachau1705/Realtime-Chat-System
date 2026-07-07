@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useChat } from '../../hooks/useChat';
-import { uploadMedia } from '../../services/api';
+import { uploadMedia, fetchUserFriends, type UserFriend } from '../../services/api';
 import { useCreatePostMutation } from '../../hooks/useFeedQuery';
 
 export function CreatePostBox() {
@@ -9,6 +9,34 @@ export function CreatePostBox() {
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Privacy settings states
+  const [visibility, setVisibility] = useState<'public' | 'friends' | 'specific_friends' | 'except_friends' | 'only_me'>('public');
+  const [showVisibilityMenu, setShowVisibilityMenu] = useState<boolean>(false);
+  const [friendsList, setFriendsList] = useState<UserFriend[]>([]);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState<boolean>(false);
+
+  const loadFriends = async () => {
+    if (!token || !currentUser || friendsList.length > 0) return;
+    setLoadingFriends(true);
+    try {
+      const data = await fetchUserFriends(token, currentUser.id);
+      setFriendsList(data);
+    } catch (err) {
+      console.error('Failed to load friends list for privacy selector', err);
+    } finally {
+      setLoadingFriends(false);
+    }
+  };
+
+  const handleVisibilityChange = (val: 'public' | 'friends' | 'specific_friends' | 'except_friends' | 'only_me') => {
+    setVisibility(val);
+    setSelectedFriendIds([]); // reset selection
+    if (val === 'specific_friends' || val === 'except_friends') {
+      loadFriends();
+    }
+  };
 
   // Use the React Query optimistic mutation
   const createPostMutation = useCreatePostMutation(token || '', currentUser);
@@ -48,11 +76,19 @@ export function CreatePostBox() {
     if (!content.trim() && imageUrls.length === 0) return;
 
     createPostMutation.mutate(
-      { content: content.trim(), mediaUrls: imageUrls },
+      { 
+        content: content.trim(), 
+        mediaUrls: imageUrls,
+        visibility,
+        allowedUserIds: visibility === 'specific_friends' ? selectedFriendIds : [],
+        blockedUserIds: visibility === 'except_friends' ? selectedFriendIds : []
+      },
       {
         onSuccess: () => {
           setContent('');
           setImageUrls([]);
+          setSelectedFriendIds([]);
+          setVisibility('public');
           showToast('Success', 'Post published successfully!', false);
         },
         onError: (err: any) => {
@@ -84,25 +120,180 @@ export function CreatePostBox() {
             currentUser?.username?.charAt(0).toUpperCase() || 'U'
           )}
         </div>
-        <textarea
-          placeholder={`What's on your mind, ${currentUser?.full_name || currentUser?.username || 'friend'}?`}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={3}
-          style={{
-            flexGrow: 1,
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            color: 'var(--text-main)',
-            fontSize: '14.5px',
-            resize: 'none',
-            fontFamily: 'inherit',
-            lineHeight: '1.5',
-            paddingTop: '8px'
-          }}
-          disabled={createPostMutation.isPending}
-        />
+        <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-main)' }}>
+              {currentUser?.full_name || currentUser?.username}
+            </span>
+            
+            {/* Privacy Selector Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setShowVisibilityMenu(!showVisibilityMenu)}
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid var(--panel-border)',
+                  borderRadius: '12px',
+                  padding: '3px 8px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                {visibility === 'public' && <><i className="fa-solid fa-earth-americas" style={{ fontSize: '10px' }} /> Public</>}
+                {visibility === 'friends' && <><i className="fa-solid fa-user-group" style={{ fontSize: '10px' }} /> Friends</>}
+                {visibility === 'specific_friends' && <><i className="fa-solid fa-user-check" style={{ fontSize: '10px' }} /> Specific Friends</>}
+                {visibility === 'except_friends' && <><i className="fa-solid fa-user-slash" style={{ fontSize: '10px' }} /> Friends Except</>}
+                {visibility === 'only_me' && <><i className="fa-solid fa-lock" style={{ fontSize: '10px' }} /> Only Me</>}
+                <i className="fa-solid fa-chevron-down" style={{ fontSize: '8px' }} />
+              </button>
+
+              {showVisibilityMenu && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  background: 'var(--panel-bg)',
+                  border: '1px solid var(--panel-border)',
+                  borderRadius: '12px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                  zIndex: 20,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '6px',
+                  minWidth: '180px'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => { handleVisibilityChange('public'); setShowVisibilityMenu(false); }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      color: 'var(--text-main)',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      borderRadius: '8px'
+                    }}
+                    className="post-action-btn"
+                  >
+                    <i className="fa-solid fa-earth-americas" style={{ width: '14px', textAlign: 'center' }} /> Public
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleVisibilityChange('friends'); setShowVisibilityMenu(false); }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      color: 'var(--text-main)',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      borderRadius: '8px'
+                    }}
+                    className="post-action-btn"
+                  >
+                    <i className="fa-solid fa-user-group" style={{ width: '14px', textAlign: 'center' }} /> Friends
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleVisibilityChange('specific_friends'); setShowVisibilityMenu(false); }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      color: 'var(--text-main)',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      borderRadius: '8px'
+                    }}
+                    className="post-action-btn"
+                  >
+                    <i className="fa-solid fa-user-check" style={{ width: '14px', textAlign: 'center' }} /> Specific Friends
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleVisibilityChange('except_friends'); setShowVisibilityMenu(false); }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      color: 'var(--text-main)',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      borderRadius: '8px'
+                    }}
+                    className="post-action-btn"
+                  >
+                    <i className="fa-solid fa-user-slash" style={{ width: '14px', textAlign: 'center' }} /> Friends Except
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleVisibilityChange('only_me'); setShowVisibilityMenu(false); }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      color: 'var(--text-main)',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      borderRadius: '8px'
+                    }}
+                    className="post-action-btn"
+                  >
+                    <i className="fa-solid fa-lock" style={{ width: '14px', textAlign: 'center' }} /> Only Me
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <textarea
+            placeholder={`What's on your mind, ${currentUser?.full_name || currentUser?.username || 'friend'}?`}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={3}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: 'var(--text-main)',
+              fontSize: '14.5px',
+              resize: 'none',
+              fontFamily: 'inherit',
+              lineHeight: '1.5',
+              paddingTop: '4px'
+            }}
+            disabled={createPostMutation.isPending}
+          />
+        </div>
       </div>
 
       {imageUrls.length > 0 && (
@@ -139,6 +330,61 @@ export function CreatePostBox() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {(visibility === 'specific_friends' || visibility === 'except_friends') && (
+        <div className="friend-selector-box" style={{
+          background: 'rgba(0,0,0,0.12)',
+          border: '1px solid var(--panel-border)',
+          borderRadius: '12px',
+          padding: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          animation: 'fadeIn 0.2s'
+        }}>
+          <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-main)' }}>
+            {visibility === 'specific_friends' ? 'Select friends allowed to view this post:' : 'Select friends blocked from viewing this post:'}
+          </div>
+          {loadingFriends ? (
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '6px' }} /> Loading friends list...
+            </div>
+          ) : friendsList.length === 0 ? (
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>You don't have any friends to select yet.</div>
+          ) : (
+            <div style={{ maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
+              {friendsList.map(f => {
+                const isChecked = selectedFriendIds.includes(f.id);
+                return (
+                  <label key={f.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '4px 6px', borderRadius: '6px', background: 'rgba(255,255,255,0.03)' }} className="friend-select-item">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div className="avatar" style={{ width: '26px', height: '26px', fontSize: '10px' }}>
+                        {f.avatar_url ? <img src={f.avatar_url} alt={f.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : f.username.charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)' }}>{f.full_name || f.username}</span>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={isChecked} 
+                      onChange={() => {
+                        setSelectedFriendIds(prev => 
+                          isChecked ? prev.filter(id => id !== f.id) : [...prev, f.id]
+                        );
+                      }}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        accentColor: 'var(--primary)',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

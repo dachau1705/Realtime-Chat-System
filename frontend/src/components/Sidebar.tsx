@@ -8,6 +8,11 @@ export function Sidebar() {
   const [adding, setAdding] = useState<boolean>(false);
   const [addResultMsg, setAddResultMsg] = useState<{ text: string; isError: boolean } | null>(null);
 
+  const [showGroupModal, setShowGroupModal] = useState<boolean>(false);
+  const [groupName, setGroupName] = useState<string>('');
+  const [groupAvatar, setGroupAvatar] = useState<string>('');
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+
   const {
     currentUser,
     activeTab,
@@ -20,6 +25,7 @@ export function Sidebar() {
     socketConnected,
     selectConversation,
     startChatWithUser,
+    createGroupChat,
     loadConversations,
     loadUserList,
     addFriend,
@@ -66,6 +72,24 @@ export function Sidebar() {
   const handleProfileClick = () => {
     if (currentUser?.id) {
       navigate(`/profile/${currentUser.id}`);
+    }
+  };
+
+  const handleCreateGroupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!groupName.trim()) return;
+    if (selectedMembers.length === 0) {
+      alert('Please select at least one member.');
+      return;
+    }
+    try {
+      await createGroupChat(groupName.trim(), selectedMembers, groupAvatar.trim() || undefined);
+      setShowGroupModal(false);
+      setGroupName('');
+      setGroupAvatar('');
+      setSelectedMembers([]);
+    } catch (err) {
+      // handled
     }
   };
 
@@ -116,6 +140,11 @@ export function Sidebar() {
           }}
         >
           <i className="fa-solid fa-message"></i> Chats
+          {Object.values(unreadBadges).reduce((a, b) => a + b, 0) > 0 && (
+            <span className="tab-btn-badge error-badge">
+              {Object.values(unreadBadges).reduce((a, b) => a + b, 0)}
+            </span>
+          )}
         </button>
         <button
           className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
@@ -143,48 +172,77 @@ export function Sidebar() {
       </div>
 
       {activeTab === 'conversations' ? (
-        <div className="conv-list" id="conversationsContainer">
-          {conversations.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', marginTop: '20px', padding: '20px' }}>
-              <i className="fa-regular fa-folder-open" style={{ fontSize: '24px', marginBottom: '8px', display: 'block', opacity: 0.5 }}></i>
-              No active chats. Select 'Users' tab to start a conversation!
-            </div>
-          ) : (
-            conversations.map((c) => {
-              const displayName = c.is_group ? (c.name || 'Group Chat') : (c.member_usernames[0] || 'Unknown User');
-              const otherUserId = c.is_group ? '' : c.member_ids[0];
-              const isActive = currentRoomId === c.id;
-              const hasBadge = unreadBadges[c.id] > 0;
+        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px 6px 16px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Recent Chats</span>
+            <button
+              onClick={() => {
+                loadUserList();
+                setShowGroupModal(true);
+              }}
+              style={{
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: 'none',
+                borderRadius: '6px',
+                color: 'var(--primary)',
+                padding: '4px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'background 0.2s'
+              }}
+            >
+              <i className="fa-solid fa-plus" /> New Group
+            </button>
+          </div>
 
-              return (
-                <div
-                  key={c.id}
-                  className={`conv-item ${isActive ? 'active' : ''}`}
-                  onClick={() => selectConversation(c.id, displayName, otherUserId)}
-                >
+          <div className="conv-list" id="conversationsContainer" style={{ flexGrow: 1, overflowY: 'auto' }}>
+            {conversations.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', marginTop: '20px', padding: '20px' }}>
+                <i className="fa-regular fa-folder-open" style={{ fontSize: '24px', marginBottom: '8px', display: 'block', opacity: 0.5 }}></i>
+                No active chats. Select 'Users' tab to start a conversation!
+              </div>
+            ) : (
+              conversations.map((c) => {
+                const displayName = c.is_group ? (c.name || 'Group Chat') : (c.member_usernames[0] || 'Unknown User');
+                const otherUserId = c.is_group ? '' : c.member_ids[0];
+                const isActive = currentRoomId === c.id;
+                const hasBadge = unreadBadges[c.id] > 0;
+
+                return (
                   <div
-                    className="avatar"
-                    onClick={(e) => {
-                      if (!c.is_group && otherUserId) {
-                        e.stopPropagation();
-                        navigate(`/profile/${otherUserId}`);
-                      }
-                    }}
-                    style={{ cursor: c.is_group ? 'default' : 'pointer' }}
-                    title={c.is_group ? '' : 'View profile'}
+                    key={c.id}
+                    className={`conv-item ${isActive ? 'active' : ''}`}
+                    onClick={() => selectConversation(c.id, displayName, otherUserId)}
                   >
-                    {!c.is_group && c.member_avatar_urls?.[0] ? (
-                      <img src={c.member_avatar_urls[0]} alt={displayName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                    ) : (
-                      displayName.charAt(0).toUpperCase()
-                    )}
-                  </div>
+                    <div
+                      className="avatar"
+                      onClick={(e) => {
+                        if (!c.is_group && otherUserId) {
+                          e.stopPropagation();
+                          navigate(`/profile/${otherUserId}`);
+                        }
+                      }}
+                      style={{ cursor: c.is_group ? 'default' : 'pointer' }}
+                      title={c.is_group ? '' : 'View profile'}
+                    >
+                      {c.is_group && c.avatar_url ? (
+                        <img src={c.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                      ) : !c.is_group && c.member_avatar_urls?.[0] ? (
+                        <img src={c.member_avatar_urls[0]} alt={displayName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                      ) : (
+                        displayName.charAt(0).toUpperCase()
+                      )}
+                    </div>
                   <div className="conv-details">
                     <div className="conv-name" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>{displayName}</span>
                       {hasBadge && (
-                        <span className="unread-badge" style={{ background: 'var(--primary)', color: 'white', fontSize: '10px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px', marginLeft: '8px' }}>
-                          New
+                        <span className="unread-badge" style={{ background: 'var(--error)', color: 'white', fontSize: '10px', fontWeight: 800, minWidth: '18px', height: '18px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', lineHeight: 1 }}>
+                          {unreadBadges[c.id]}
                         </span>
                       )}
                     </div>
@@ -197,6 +255,7 @@ export function Sidebar() {
             })
           )}
         </div>
+      </div>
       ) : activeTab === 'users' ? (
         <div className="users-tab-content" style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }}>
           <div className="add-friend-bar" style={{ padding: '16px', borderBottom: '1px solid var(--panel-border)', background: 'rgba(0,0,0,0.08)' }}>
@@ -357,6 +416,180 @@ export function Sidebar() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* Create Group Chat Modal */}
+      {showGroupModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: 'var(--panel-bg)',
+            border: '1px solid var(--panel-border)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '420px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            animation: 'fadeIn 0.2s'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px',
+              borderBottom: '1px solid var(--panel-border)'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-main)' }}>Create Group Chat</h3>
+              <button
+                type="button"
+                onClick={() => setShowGroupModal(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px' }}
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleCreateGroupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>Group Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Project Avengers"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid var(--panel-border)',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    color: 'white',
+                    fontSize: '13.5px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>Group Avatar URL (Optional)</label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/avatar.png"
+                  value={groupAvatar}
+                  onChange={(e) => setGroupAvatar(e.target.value)}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid var(--panel-border)',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    color: 'white',
+                    fontSize: '13.5px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>Select Members</label>
+                <div style={{
+                  border: '1px solid var(--panel-border)',
+                  borderRadius: '8px',
+                  maxHeight: '150px',
+                  overflowY: 'auto',
+                  background: 'rgba(0,0,0,0.1)'
+                }}>
+                  {users.length === 0 ? (
+                    <div style={{ padding: '12px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                      No members available
+                    </div>
+                  ) : (
+                    users.filter(u => u.id !== currentUser?.id).map((u) => {
+                      const isChecked = selectedMembers.includes(u.id);
+                      return (
+                        <label
+                          key={u.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            borderBottom: '1px solid rgba(255,255,255,0.02)',
+                            cursor: 'pointer',
+                            transition: 'background 0.2s',
+                            textAlign: 'left'
+                          }}
+                          className="friend-select-item"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div className="avatar" style={{ width: '24px', height: '24px', fontSize: '10px' }}>
+                              {u.avatar_url ? <img src={u.avatar_url} alt={u.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : u.username.charAt(0).toUpperCase()}
+                            </div>
+                            <span style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: 500 }}>{u.full_name || u.username}</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setSelectedMembers(prev =>
+                                isChecked ? prev.filter(id => id !== u.id) : [...prev, u.id]
+                              );
+                            }}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                          />
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowGroupModal(false)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--panel-border)',
+                    borderRadius: '8px',
+                    color: 'var(--text-main)',
+                    padding: '8px 14px',
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    fontWeight: 500
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="primary-btn"
+                  style={{
+                    width: 'auto',
+                    padding: '8px 16px',
+                    fontSize: '12.5px',
+                    borderRadius: '8px',
+                    fontWeight: 600
+                  }}
+                >
+                  Create Group
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

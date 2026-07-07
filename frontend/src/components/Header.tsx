@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
+import { useSearchUsers, useGetMyPages } from '../utils/api';
 
 interface UserSearchResult {
   id: string;
@@ -20,21 +21,24 @@ interface MyPageItem {
 export function Header() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { token, currentUser, logout } = useChat();
+  const { token, currentUser, logout, unreadBadges, conversations, selectConversation } = useChat();
 
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
-  const [loadingSearch, setLoadingSearch] = useState(false);
+  const [showPagesMenu, setShowPagesMenu] = useState(false);
+  const searchResults = useSearchUsers(searchQuery, { enabled: !!token }) as any as UserSearchResult[];
+  const myPages = useGetMyPages({ enabled: !!token && showPagesMenu }) as any as MyPageItem[];
+
+  const loadingSearch = false;
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  const [myPages, setMyPages] = useState<MyPageItem[]>([]);
-  const [showPagesMenu, setShowPagesMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showChatsMenu, setShowChatsMenu] = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const chatsRef = useRef<HTMLDivElement>(null);
 
   // Theme synchronization
   useEffect(() => {
@@ -50,50 +54,6 @@ export function Header() {
     setTheme(nextTheme);
   };
 
-  // Debounced search logic
-  useEffect(() => {
-    if (!token || !searchQuery.trim()) {
-      setSearchResults([]);
-      setLoadingSearch(false);
-      return;
-    }
-
-    setLoadingSearch(true);
-    const delayDebounce = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/search/users?q=${encodeURIComponent(searchQuery.trim())}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setSearchResults(data);
-        }
-      } catch (err) {
-        console.error('Failed to search users', err);
-      } finally {
-        setLoadingSearch(false);
-      }
-    }, 350);
-
-    return () => clearTimeout(delayDebounce);
-  }, [searchQuery, token]);
-
-  // Fetch user pages
-  const fetchMyPages = async () => {
-    if (!token) return;
-    try {
-      const res = await fetch('/api/pages/my', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMyPages(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch user pages', err);
-    }
-  };
-
   // Close menus when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -105,6 +65,9 @@ export function Header() {
       }
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setShowProfileMenu(false);
+      }
+      if (chatsRef.current && !chatsRef.current.contains(event.target as Node)) {
+        setShowChatsMenu(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -186,13 +149,145 @@ export function Header() {
           <i className="fa-solid fa-house" />
           <span>Feed</span>
         </button>
-        <button
-          className={`nav-shortcut-btn ${location.pathname === '/chat' ? 'active' : ''}`}
-          onClick={() => navigate('/chat')}
-        >
-          <i className="fa-solid fa-comment-dots" />
-          <span>Chats</span>
-        </button>
+        
+        <div ref={chatsRef} style={{ position: 'relative', display: 'inline-block' }}>
+          <button
+            type="button"
+            className={`nav-shortcut-btn ${location.pathname === '/chat' ? 'active' : ''}`}
+            onClick={() => setShowChatsMenu(!showChatsMenu)}
+            style={{ position: 'relative' }}
+          >
+            <i className="fa-solid fa-comment-dots" />
+            <span>Chats</span>
+            {Object.values(unreadBadges).reduce((a, b) => a + b, 0) > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '-4px',
+                background: 'var(--error)',
+                color: 'white',
+                fontSize: '9px',
+                fontWeight: 800,
+                minWidth: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 3px',
+                lineHeight: 1,
+                boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+              }}>
+                {Object.values(unreadBadges).reduce((a, b) => a + b, 0)}
+              </span>
+            )}
+          </button>
+
+          {showChatsMenu && (
+            <div className="header-dropdown-panel" style={{ 
+              position: 'absolute',
+              top: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              marginTop: '8px',
+              minWidth: '320px',
+              zIndex: 20
+            }}>
+              <div className="dropdown-panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Chats</span>
+                <span 
+                  onClick={() => { navigate('/chat'); setShowChatsMenu(false); }} 
+                  style={{ fontSize: '12px', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Open in Messenger
+                </span>
+              </div>
+              
+              <div className="panel-list-scroll" style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                {conversations.length === 0 ? (
+                  <div className="panel-empty-info">No active chats. Start a chat from the users list.</div>
+                ) : (
+                  conversations.map((c) => {
+                    const displayName = c.is_group ? (c.name || 'Group Chat') : (c.member_usernames[0] || 'Unknown User');
+                    const otherUserId = c.is_group ? '' : c.member_ids[0];
+                    const hasBadge = unreadBadges[c.id] > 0;
+
+                    return (
+                      <div
+                        key={c.id}
+                        className="panel-list-item"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '10px 12px',
+                          cursor: 'pointer',
+                          borderRadius: '8px',
+                          background: hasBadge ? 'rgba(99, 102, 241, 0.05)' : 'transparent',
+                          transition: 'background 0.2s',
+                          textAlign: 'left'
+                        }}
+                        onClick={() => {
+                          setShowChatsMenu(false);
+                          navigate('/chat');
+                          selectConversation(c.id, displayName, otherUserId);
+                        }}
+                      >
+                        <div className="avatar" style={{ width: '36px', height: '36px', flexShrink: 0 }}>
+                          {!c.is_group && c.member_avatar_urls?.[0] ? (
+                            <img src={c.member_avatar_urls[0]} alt={displayName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                          ) : (
+                            displayName.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div style={{ flexGrow: 1, minWidth: 0 }}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {displayName}
+                            </span>
+                            {hasBadge && (
+                              <span style={{
+                                background: 'var(--error)',
+                                color: 'white',
+                                fontSize: '9px',
+                                fontWeight: 800,
+                                minWidth: '14px',
+                                height: '14px',
+                                borderRadius: '50%',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '0 2px',
+                                lineHeight: 1
+                              }}>
+                                {unreadBadges[c.id]}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{
+                            fontSize: '11px',
+                            color: hasBadge ? 'var(--text-main)' : 'var(--text-muted)',
+                            fontWeight: hasBadge ? 'bold' : 'normal',
+                            marginTop: '2px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {hasBadge ? 'New messages' : 'Click to view conversation'}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* 4. Dropdown Menus */}
@@ -216,7 +311,6 @@ export function Header() {
             className={`action-icon-btn ${showPagesMenu ? 'active' : ''}`}
             onClick={() => {
               setShowPagesMenu(!showPagesMenu);
-              if (!showPagesMenu) fetchMyPages();
             }}
             title="My Pages"
           >

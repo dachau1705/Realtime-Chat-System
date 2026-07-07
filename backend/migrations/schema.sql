@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255), -- NULL for 1-to-1 chats
     is_group BOOLEAN DEFAULT FALSE,
+    avatar_url VARCHAR(1024),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -99,6 +100,9 @@ CREATE TABLE IF NOT EXISTS posts (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
     content TEXT NULL,
     media_urls TEXT[] DEFAULT '{}'::TEXT[] NOT NULL,
+    visibility VARCHAR(20) DEFAULT 'public' NOT NULL,
+    allowed_user_ids UUID[] DEFAULT '{}'::UUID[] NOT NULL,
+    blocked_user_ids UUID[] DEFAULT '{}'::UUID[] NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

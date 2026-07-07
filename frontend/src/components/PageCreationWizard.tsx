@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
+import { useGetPageCategories, createPageApi } from '../utils/api';
 
 interface Category {
   id: string;
@@ -12,8 +13,8 @@ export default function PageCreationWizard() {
   const navigate = useNavigate();
   const { token, showToast } = useChat();
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
+  const categories = useGetPageCategories({ enabled: !!token }) as any as Category[];
+  const loadingCategories = categories.length === 0;
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4; // Logical stages combining the 9 validation checkpoints
 
@@ -34,27 +35,10 @@ export default function PageCreationWizard() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    async function loadCats() {
-      if (!token) return;
-      try {
-        const res = await fetch('/api/page-categories', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setCategories(data);
-          if (data.length > 0) {
-            setCategoryId(data[0].id);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load categories', err);
-      } finally {
-        setLoadingCategories(false);
-      }
+    if (categories && categories.length > 0 && !categoryId) {
+      setCategoryId(categories[0].id);
     }
-    loadCats();
-  }, [token]);
+  }, [categories, categoryId]);
 
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,22 +83,13 @@ export default function PageCreationWizard() {
     };
 
     try {
-      const res = await fetch('/api/pages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
+      const res = await createPageApi(payload);
 
-      const data = await res.json();
-
-      if (res.ok) {
+      if (res.data && res.data.status !== false) {
         showToast('Success', 'Your Fanpage was created successfully!', false);
-        navigate(`/pages/${data.id}`);
+        navigate(`/pages/${res.data.id}`);
       } else {
-        showToast('Creation Failed', data.error || 'Check fields and try again.', true);
+        showToast('Creation Failed', res.data.mess || 'Check fields and try again.', true);
       }
     } catch (err: any) {
       showToast('Network Error', err.message || 'Failed to submit form.', true);
