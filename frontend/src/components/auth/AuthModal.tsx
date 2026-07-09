@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useChat } from '../hooks/useChat';
-import { login as apiLogin, register as apiRegister, seedDatabase, checkBackendHealth } from '../services/api';
+import { useChat } from '../../hooks/useChat';
+import { login as apiLogin, register as apiRegister, seedDatabase, checkBackendHealth } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 
 export function AuthModal() {
+  const { t } = useLanguage();
   const { connectSocket, setToken, setCurrentUser, setOtherUser } = useChat();
   
   const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
@@ -102,13 +104,13 @@ export function AuthModal() {
       <div className="modal-content">
         {!isRegisterMode ? (
           <div id="loginFormSection">
-            <h1>Welcome Back</h1>
-            <p>Log in to access your secure chat workspace</p>
+            <h1>{t('auth.welcomeBack')}</h1>
+            <p>{t('auth.welcomeDesc')}</p>
 
             {isBackendOffline && (
               <div id="fallbackNotice" style={{ display: 'block', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid var(--warning)', borderRadius: '12px', padding: '12px', marginBottom: '20px', textAlign: 'left', fontSize: '13px' }}>
                 <i className="fa-solid fa-triangle-exclamation" style={{ color: 'var(--warning)', marginRight: '6px' }}></i>
-                <strong>Notice:</strong> Running in <strong>Local Fallback Mode</strong>. Using simulation parameters instead.
+                {t('auth.fallbackNotice')}
               </div>
             )}
 
@@ -121,7 +123,7 @@ export function AuthModal() {
 
             <form id="loginForm" onSubmit={handleLoginSubmit}>
               <div className="form-group">
-                <label htmlFor="loginUsername">Username</label>
+                <label htmlFor="loginUsername">{t('auth.username')}</label>
                 <input
                   type="text"
                   id="loginUsername"
@@ -133,7 +135,7 @@ export function AuthModal() {
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="loginPassword">Password</label>
+                <label htmlFor="loginPassword">{t('auth.password')}</label>
                 <input
                   type="password"
                   id="loginPassword"
@@ -145,16 +147,19 @@ export function AuthModal() {
                 />
               </div>
               <button type="submit" className="primary-btn">
-                <i className="fa-solid fa-right-to-bracket"></i> Sign In
+                <i className="fa-solid fa-right-to-bracket"></i> {t('auth.signIn')}
               </button>
             </form>
 
             <div className="toggle-link">
-              Don't have an account? <span style={{ cursor: 'pointer' }} onClick={() => setIsRegisterMode(true)}>Register here</span>
+              {t('auth.noAccount')}{' '}
+              <span style={{ cursor: 'pointer' }} onClick={() => setIsRegisterMode(true)}>
+                {t('auth.registerHere')}
+              </span>
             </div>
 
             <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--panel-border)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>Or quick start with test accounts:</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>{t('auth.orQuickStart')}</div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button className="setup-btn" style={{ flex: 1, padding: '10px 14px', fontSize: '13px', borderRadius: '10px', cursor: 'pointer' }} onClick={() => quickStart('alice')}>
                   <span>Alice</span> <i className="fa-solid fa-chevron-right" style={{ fontSize: '10px' }}></i>
@@ -167,8 +172,8 @@ export function AuthModal() {
           </div>
         ) : (
           <div id="registerFormSection">
-            <h1>Create Account</h1>
-            <p>Register a new user to start chatting</p>
+            <h1>{t('auth.createAccount')}</h1>
+            <p>{t('auth.createAccountDesc')}</p>
 
             {registerError && (
               <div id="registerError" style={{ display: 'block', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error)', color: '#f87171', borderRadius: '12px', padding: '12px', marginBottom: '20px', textAlign: 'left', fontSize: '13px' }}>
@@ -179,7 +184,7 @@ export function AuthModal() {
 
             <form id="registerForm" onSubmit={handleRegisterSubmit}>
               <div className="form-group">
-                <label htmlFor="registerUsername">Username</label>
+                <label htmlFor="registerUsername">{t('auth.username')}</label>
                 <input
                   type="text"
                   id="registerUsername"
@@ -191,7 +196,7 @@ export function AuthModal() {
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="registerEmail">Email Address</label>
+                <label htmlFor="registerEmail">{t('auth.email')}</label>
                 <input
                   type="email"
                   id="registerEmail"
@@ -203,7 +208,7 @@ export function AuthModal() {
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="registerPassword">Password</label>
+                <label htmlFor="registerPassword">{t('auth.password')}</label>
                 <input
                   type="password"
                   id="registerPassword"
@@ -215,12 +220,15 @@ export function AuthModal() {
                 />
               </div>
               <button type="submit" className="primary-btn">
-                <i className="fa-solid fa-user-plus"></i> Create Account
+                <i className="fa-solid fa-user-plus"></i> {t('auth.signUp')}
               </button>
             </form>
 
             <div className="toggle-link">
-              Already have an account? <span style={{ cursor: 'pointer' }} onClick={() => setIsRegisterMode(false)}>Sign In here</span>
+              {t('auth.hasAccount')}{' '}
+              <span style={{ cursor: 'pointer' }} onClick={() => setIsRegisterMode(false)}>
+                {t('auth.signInHere')}
+              </span>
             </div>
           </div>
         )}

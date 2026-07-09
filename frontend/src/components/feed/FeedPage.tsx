@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useChat } from '../hooks/useChat';
-import { FeedContainer } from './feed/FeedContainer';
-import { fetchSuggestions, followUser, type UserSuggestion } from '../services/api';
+import { useChat } from '../../hooks/useChat';
+import { FeedContainer } from './FeedContainer';
+import { fetchSuggestions, followUser, type UserSuggestion } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 
 export function FeedPage() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { token, showToast, users } = useChat();
 
   const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
@@ -34,12 +36,12 @@ export function FeedPage() {
     setActionUserId(targetUserId);
     try {
       await followUser(token, targetUserId);
-      showToast('Success', 'Successfully followed user!', false);
+      showToast(t('friends.addFriend') || 'Success', t('feed.followSuccess'), false);
       
       // Remove followed user from local suggestions list
       setSuggestions((prev) => prev.filter((s) => s.id !== targetUserId));
     } catch (err: any) {
-      showToast('Error', err.message || 'Failed to follow user', true);
+      showToast(t('friends.delete') || 'Error', err.message || t('feed.followError'), true);
     } finally {
       setActionUserId(null);
     }
@@ -104,16 +106,16 @@ export function FeedPage() {
         {/* Suggested Friends Section */}
         <div>
           <h3 style={{ fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', marginBottom: '14px' }}>
-            <i className="fa-solid fa-user-plus" style={{ color: 'var(--primary)' }}></i> Suggested Friends
+            <i className="fa-solid fa-user-plus" style={{ color: 'var(--primary)' }}></i> {t('feed.suggestedFriends')}
           </h3>
 
           {loadingSuggestions ? (
             <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', textAlign: 'center', padding: '12px' }}>
-              <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '6px' }}></i> Loading suggestions...
+              <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '6px' }}></i> {t('feed.loadingSuggestions')}
             </div>
           ) : suggestions.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', textAlign: 'center', padding: '12px' }}>
-              No suggestions available
+              {t('feed.noSuggestions')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -173,7 +175,7 @@ export function FeedPage() {
                       flexShrink: 0
                     }}
                   >
-                    {actionUserId === user.id ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Follow'}
+                    {actionUserId === user.id ? <i className="fa-solid fa-spinner fa-spin"></i> : t('feed.follow')}
                   </button>
                 </div>
               ))}
@@ -184,7 +186,7 @@ export function FeedPage() {
         {/* Trending Section */}
         <div>
           <h3 style={{ fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', marginBottom: '14px' }}>
-            <i className="fa-solid fa-fire" style={{ color: '#E42645' }}></i> Trending Topics
+            <i className="fa-solid fa-fire" style={{ color: '#E42645' }}></i> {t('feed.trendingTopics')}
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {trendingTopics.map((topic, i) => (
@@ -211,11 +213,11 @@ export function FeedPage() {
         {/* Online Friends Section */}
         <div>
           <h3 style={{ fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', marginBottom: '14px' }}>
-            <i className="fa-solid fa-circle" style={{ color: 'var(--success)', fontSize: '10px' }}></i> Active Friends
+            <i className="fa-solid fa-circle" style={{ color: 'var(--success)', fontSize: '10px' }}></i> {t('feed.activeFriends')}
           </h3>
           {onlineUsers.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: '12px', padding: '6px' }}>
-              No friends online
+              {t('feed.noFriendsOnline')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

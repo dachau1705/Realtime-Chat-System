@@ -1,16 +1,17 @@
 import { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { useChat } from './hooks/useChat';
-import { AuthModal } from './components/AuthModal';
-import { Sidebar } from './components/Sidebar';
-import { ChatArea } from './components/ChatArea';
-import { ProfileScreen } from './components/ProfileScreen';
-import { FeedPage } from './components/FeedPage';
-import { PostDetailPage } from './components/PostDetailPage';
-import { Header } from './components/Header';
-import PageCreationWizard from './components/PageCreationWizard';
-import { PageDetail } from './components/PageDetail';
-import { FriendsMainPage } from './components/FriendsMainPage';
+import { AuthModal } from './components/auth/AuthModal';
+import { Sidebar } from './components/layout/Sidebar';
+import { ChatSidebar } from './components/chat/ChatSidebar';
+import { ChatArea } from './components/chat/ChatArea';
+import { ProfileScreen } from './components/profile/ProfileScreen';
+import { FeedPage } from './components/feed/FeedPage';
+import { PostDetailPage } from './components/post/PostDetailPage';
+import { Header } from './components/layout/Header';
+import PageCreationWizard from './components/pages/PageCreationWizard';
+import { PageDetail } from './components/pages/PageDetail';
+import { FriendsMainPage } from './components/friends/FriendsMainPage';
 
 export default function App() {
   const { token, setToken, setCurrentUser, connectSocket, toasts, dismissToast, activeTab, setActiveTab } = useChat();
@@ -68,7 +69,7 @@ export default function App() {
                 } />
                 <Route path="/chat" element={
                   <div className="container">
-                    <Sidebar />
+                    <ChatSidebar />
                     <ChatArea />
                   </div>
                 } />

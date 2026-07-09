@@ -2,8 +2,10 @@ import React, { useState, useRef } from 'react';
 import { useChat } from '../../hooks/useChat';
 import { uploadMedia, fetchUserFriends, type UserFriend } from '../../services/api';
 import { useCreatePostMutation } from '../../hooks/useFeedQuery';
+import { useLanguage } from '../../context/LanguageContext';
 
 export function CreatePostBox() {
+  const { t } = useLanguage();
   const { token, showToast, currentUser } = useChat();
   const [content, setContent] = useState<string>('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -50,7 +52,7 @@ export function CreatePostBox() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (file.size > 10 * 1024 * 1024) {
-          showToast('Error', `File ${file.name} exceeds 10MB limit`, true);
+          showToast(t('friends.delete') || 'Error', `File ${file.name} exceeds 10MB limit`, true);
           continue;
         }
         const response = await uploadMedia(token, file);
@@ -89,10 +91,10 @@ export function CreatePostBox() {
           setImageUrls([]);
           setSelectedFriendIds([]);
           setVisibility('public');
-          showToast('Success', 'Post published successfully!', false);
+          showToast(t('friends.addFriend') || 'Success', t('post.publishSuccess'), false);
         },
         onError: (err: any) => {
-          showToast('Publish Failed', err.message || 'Failed to create post', true);
+          showToast(t('post.publishError'), err.message || 'Failed to create post', true);
         }
       }
     );
@@ -145,11 +147,11 @@ export function CreatePostBox() {
                   cursor: 'pointer'
                 }}
               >
-                {visibility === 'public' && <><i className="fa-solid fa-earth-americas" style={{ fontSize: '10px' }} /> Public</>}
-                {visibility === 'friends' && <><i className="fa-solid fa-user-group" style={{ fontSize: '10px' }} /> Friends</>}
-                {visibility === 'specific_friends' && <><i className="fa-solid fa-user-check" style={{ fontSize: '10px' }} /> Specific Friends</>}
-                {visibility === 'except_friends' && <><i className="fa-solid fa-user-slash" style={{ fontSize: '10px' }} /> Friends Except</>}
-                {visibility === 'only_me' && <><i className="fa-solid fa-lock" style={{ fontSize: '10px' }} /> Only Me</>}
+                {visibility === 'public' && <><i className="fa-solid fa-earth-americas" style={{ fontSize: '10px' }} /> {t('post.public')}</>}
+                {visibility === 'friends' && <><i className="fa-solid fa-user-group" style={{ fontSize: '10px' }} /> {t('post.friends')}</>}
+                {visibility === 'specific_friends' && <><i className="fa-solid fa-user-check" style={{ fontSize: '10px' }} /> {t('post.specificFriends')}</>}
+                {visibility === 'except_friends' && <><i className="fa-solid fa-user-slash" style={{ fontSize: '10px' }} /> {t('post.exceptFriends')}</>}
+                {visibility === 'only_me' && <><i className="fa-solid fa-lock" style={{ fontSize: '10px' }} /> {t('post.onlyMe')}</>}
                 <i className="fa-solid fa-chevron-down" style={{ fontSize: '8px' }} />
               </button>
 
@@ -187,7 +189,7 @@ export function CreatePostBox() {
                     }}
                     className="post-action-btn"
                   >
-                    <i className="fa-solid fa-earth-americas" style={{ width: '14px', textAlign: 'center' }} /> Public
+                    <i className="fa-solid fa-earth-americas" style={{ width: '14px', textAlign: 'center' }} /> {t('post.public')}
                   </button>
                   <button
                     type="button"
@@ -207,7 +209,7 @@ export function CreatePostBox() {
                     }}
                     className="post-action-btn"
                   >
-                    <i className="fa-solid fa-user-group" style={{ width: '14px', textAlign: 'center' }} /> Friends
+                    <i className="fa-solid fa-user-group" style={{ width: '14px', textAlign: 'center' }} /> {t('post.friends')}
                   </button>
                   <button
                     type="button"
@@ -227,7 +229,7 @@ export function CreatePostBox() {
                     }}
                     className="post-action-btn"
                   >
-                    <i className="fa-solid fa-user-check" style={{ width: '14px', textAlign: 'center' }} /> Specific Friends
+                    <i className="fa-solid fa-user-check" style={{ width: '14px', textAlign: 'center' }} /> {t('post.specificFriends')}
                   </button>
                   <button
                     type="button"
@@ -247,7 +249,7 @@ export function CreatePostBox() {
                     }}
                     className="post-action-btn"
                   >
-                    <i className="fa-solid fa-user-slash" style={{ width: '14px', textAlign: 'center' }} /> Friends Except
+                    <i className="fa-solid fa-user-slash" style={{ width: '14px', textAlign: 'center' }} /> {t('post.exceptFriends')}
                   </button>
                   <button
                     type="button"
@@ -267,7 +269,7 @@ export function CreatePostBox() {
                     }}
                     className="post-action-btn"
                   >
-                    <i className="fa-solid fa-lock" style={{ width: '14px', textAlign: 'center' }} /> Only Me
+                    <i className="fa-solid fa-lock" style={{ width: '14px', textAlign: 'center' }} /> {t('post.onlyMe')}
                   </button>
                 </div>
               )}
@@ -275,7 +277,7 @@ export function CreatePostBox() {
           </div>
 
           <textarea
-            placeholder={`What's on your mind, ${currentUser?.full_name || currentUser?.username || 'friend'}?`}
+            placeholder={t('post.whatsOnYourMind').replace('{name}', currentUser?.full_name || currentUser?.username || 'friend')}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={3}
@@ -345,14 +347,14 @@ export function CreatePostBox() {
           animation: 'fadeIn 0.2s'
         }}>
           <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-main)' }}>
-            {visibility === 'specific_friends' ? 'Select friends allowed to view this post:' : 'Select friends blocked from viewing this post:'}
+            {visibility === 'specific_friends' ? t('post.selectAllowedFriends') : t('post.selectBlockedFriends')}
           </div>
           {loadingFriends ? (
             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '6px' }} /> Loading friends list...
+              <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '6px' }} /> {t('post.loadingFriends')}
             </div>
           ) : friendsList.length === 0 ? (
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>You don't have any friends to select yet.</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t('post.noFriendsToSelect')}</div>
           ) : (
             <div style={{ maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
               {friendsList.map(f => {
@@ -433,7 +435,7 @@ export function CreatePostBox() {
             ) : (
               <i className="fa-regular fa-image" style={{ color: 'var(--success)', fontSize: '16px' }}></i>
             )}
-            <span>Photo</span>
+            <span>{t('post.photo')}</span>
           </button>
 
           {/* Video Mock */}
@@ -458,7 +460,7 @@ export function CreatePostBox() {
             disabled={createPostMutation.isPending}
           >
             <i className="fa-solid fa-video" style={{ color: '#E42645', fontSize: '15px' }}></i>
-            <span>Video</span>
+            <span>{t('post.video')}</span>
           </button>
 
           {/* Feeling Mock */}
@@ -483,7 +485,7 @@ export function CreatePostBox() {
             disabled={createPostMutation.isPending}
           >
             <i className="fa-regular fa-face-smile" style={{ color: '#EAB026', fontSize: '16px' }}></i>
-            <span>Feeling</span>
+            <span>{t('post.feeling')}</span>
           </button>
         </div>
 
@@ -500,7 +502,7 @@ export function CreatePostBox() {
           }}
           disabled={isBtnDisabled}
         >
-          {createPostMutation.isPending ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Share'}
+          {createPostMutation.isPending ? <i className="fa-solid fa-spinner fa-spin"></i> : t('post.share')}
         </button>
       </div>
     </div>

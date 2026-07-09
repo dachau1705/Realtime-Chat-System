@@ -3,8 +3,10 @@ import { StoryCard } from './StoryCard';
 import { useChat } from '../../hooks/useChat';
 import { useStoriesQuery, useCreateStoryMutation } from '../../hooks/useStoriesQuery';
 import { uploadMedia, type Story } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 
 export function StoryBar() {
+  const { t } = useLanguage();
   const { token, currentUser, showToast } = useChat();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,20 +56,20 @@ export function StoryBar() {
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      showToast('Error', 'File exceeds 10MB limit', true);
+      showToast(t('friends.delete') || 'Error', 'File exceeds 10MB limit', true);
       return;
     }
 
     try {
-      showToast('Uploading', 'Uploading story media to cloud...', false);
+      showToast(t('story.uploading') || 'Uploading', 'Uploading story media to cloud...', false);
       const uploadRes = await uploadMedia(token || '', file);
       
-      showToast('Publishing', 'Creating story...', false);
+      showToast(t('story.publishing') || 'Publishing', 'Creating story...', false);
       await createStoryMutation.mutateAsync(uploadRes.url);
       
-      showToast('Success', 'Story published successfully!', false);
+      showToast(t('friends.addFriend') || 'Success', t('story.uploadStorySuccess'), false);
     } catch (err: any) {
-      showToast('Error', err.message || 'Failed to publish story', true);
+      showToast(t('friends.delete') || 'Error', err.message || t('story.postStoryError'), true);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
@@ -163,7 +165,7 @@ export function StoryBar() {
       >
         {/* Current user's create-story card */}
         <StoryCard 
-          story={{ id: 'me', username: 'Create Story', thumbnailUrl: '', userAvatar: null, userId: '', createdAt: '' }} 
+          story={{ id: 'me', username: t('story.createStory'), thumbnailUrl: '', userAvatar: null, userId: '', createdAt: '' }} 
           isCreateCard={true} 
           currentUserAvatar={currentUser?.avatar_url}
           onClick={handleCreateStoryClick}

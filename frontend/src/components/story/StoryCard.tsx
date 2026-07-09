@@ -1,4 +1,5 @@
 import { type Story } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface StoryCardProps {
   story: Story;
@@ -8,6 +9,7 @@ interface StoryCardProps {
 }
 
 export function StoryCard({ story, isCreateCard = false, currentUserAvatar, onClick }: StoryCardProps) {
+  const { t } = useLanguage();
   if (isCreateCard) {
     return (
       <div 
@@ -68,7 +70,7 @@ export function StoryCard({ story, isCreateCard = false, currentUserAvatar, onCl
             <i className="fa-solid fa-plus"></i>
           </div>
           <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-main)', marginTop: '14px', textAlign: 'center' }}>
-            Create Story
+            {t('story.createStory')}
           </span>
         </div>
       </div>

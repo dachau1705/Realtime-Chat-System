@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useChat } from '../hooks/useChat';
-import { fetchSuggestions, fetchUserProfile } from '../services/api';
+import { useChat } from '../../hooks/useChat';
+import { fetchSuggestions, fetchUserProfile } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface FriendsPageProps {
   activeTab: 'home' | 'requests' | 'suggestions' | 'all' | 'birthdays' | 'lists';
@@ -11,6 +12,7 @@ interface FriendsPageProps {
 
 export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: FriendsPageProps) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { 
     users, 
     friendRequests, 
@@ -151,9 +153,9 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
           {/* Welcome Dashboard Banner */}
           <div style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(79, 70, 229, 0.02))', border: '1px solid var(--panel-border)', borderRadius: '20px', padding: '28px', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'relative', zIndex: 2 }}>
-              <h1 style={{ fontSize: '26px', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Friends Dashboard</h1>
+              <h1 style={{ fontSize: '26px', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>{t('friends.dashboardTitle')}</h1>
               <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '6px 0 0 0', maxWidth: '500px', lineHeight: 1.5 }}>
-                Manage your connections, accept pending invites, find suggestions, and celebrate birthdays with your friends.
+                {t('friends.dashboardDesc')}
               </p>
             </div>
             <div style={{ position: 'absolute', right: '30px', bottom: '-10px', fontSize: '100px', opacity: 0.05, color: 'var(--primary)', transform: 'rotate(15deg)' }}>
@@ -165,7 +167,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
-                Friend Requests ({friendRequests.length})
+                {t('friends.pendingRequests')} ({friendRequests.length})
               </h2>
               {friendRequests.length > 0 && (
                 <button 
@@ -179,7 +181,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
             {friendRequests.length === 0 ? (
               <div style={{ background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', borderRadius: '16px', padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13.5px' }}>
                 <i className="fa-solid fa-user-clock" style={{ fontSize: '24px', marginBottom: '8px', opacity: 0.4, display: 'block' }}></i>
-                No pending requests.
+                {t('friends.noRequests')}
               </div>
             ) : (
               <div className="friends-grid-list">
@@ -200,7 +202,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                         <i className="fa-solid fa-user-group" style={{ fontSize: '9px', color: 'var(--primary)' }}></i>
-                        <span>{((req.sender_username.charCodeAt(0) + req.sender_username.length) % 5) + 1} mutual friends</span>
+                        <span>{((req.sender_username.charCodeAt(0) + req.sender_username.length) % 5) + 1} {t('friends.mutualFriends')}</span>
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {req.sender_email}
@@ -212,14 +214,14 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                         className="friends-action-btn-primary"
                         style={{ flex: 1, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 0', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                       >
-                        Confirm
+                        {t('friends.confirm')}
                       </button>
                       <button 
                         onClick={() => declineRequest(req.sender_id)}
                         className="friends-action-btn-secondary"
                         style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--panel-border)', borderRadius: '10px', padding: '10px 0', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                       >
-                        Delete
+                        {t('friends.delete')}
                       </button>
                     </div>
                   </div>
@@ -233,7 +235,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
-                  Sent Requests ({sentRequests.length})
+                  {t('friends.sentRequests')} ({sentRequests.length})
                 </h2>
               </div>
               <div className="friends-grid-list">
@@ -254,7 +256,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                         <i className="fa-solid fa-user-group" style={{ fontSize: '9px', color: 'var(--primary)' }}></i>
-                        <span>{((req.receiver_username.charCodeAt(0) + req.receiver_username.length) % 5) + 1} mutual friends</span>
+                        <span>{((req.receiver_username.charCodeAt(0) + req.receiver_username.length) % 5) + 1} {t('friends.mutualFriends')}</span>
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {req.receiver_email}
@@ -265,7 +267,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                       className="friends-action-btn-secondary"
                       style={{ width: '100%', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px', padding: '10px 0', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '8px' }}
                     >
-                      <i className="fa-solid fa-user-xmark" style={{ fontSize: '11px' }}></i> Cancel Request
+                      <i className="fa-solid fa-user-xmark" style={{ fontSize: '11px' }}></i> {t('friends.cancelRequest')}
                     </button>
                   </div>
                 ))}
@@ -277,7 +279,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
-                People You May Know
+                {t('friends.peopleYouMayKnow')}
               </h2>
               {suggestions.length > 4 && (
                 <button 
@@ -295,7 +297,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
             ) : suggestions.length === 0 ? (
               <div style={{ background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', borderRadius: '16px', padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13.5px' }}>
                 <i className="fa-solid fa-user-group" style={{ fontSize: '24px', marginBottom: '8px', opacity: 0.4, display: 'block' }}></i>
-                No suggestions available.
+                {t('friends.noRequests')}
               </div>
             ) : (
               <div className="friends-grid-list">
@@ -316,7 +318,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                         <i className="fa-solid fa-user-group" style={{ fontSize: '9px', color: 'var(--primary)' }}></i>
-                        <span>{((friend.username.charCodeAt(0) + friend.username.length) % 5) + 1} mutual friends</span>
+                        <span>{((friend.username.charCodeAt(0) + friend.username.length) % 5) + 1} {t('friends.mutualFriends')}</span>
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         @{friend.username}
@@ -327,7 +329,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                       className="friends-action-btn-primary"
                       style={{ width: '100%', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 0', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '8px' }}
                     >
-                      <i className="fa-solid fa-user-plus" style={{ fontSize: '11px' }}></i> Add Friend
+                      <i className="fa-solid fa-user-plus" style={{ fontSize: '11px' }}></i> {t('friends.addFriend')}
                     </button>
                   </div>
                 ))}
@@ -379,7 +381,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                         <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>•</span>
                         <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <i className="fa-solid fa-user-group" style={{ fontSize: '10px', color: 'var(--primary)' }}></i>
-                          {((selectedProfile.username.charCodeAt(0) + selectedProfile.username.length) % 5) + 1} mutual friends
+                          {((selectedProfile.username.charCodeAt(0) + selectedProfile.username.length) % 5) + 1} {t('friends.mutualFriends')}
                         </span>
                       </div>
                       {selectedProfile.bio && <p className="profile-bio-text" style={{ fontSize: '12px', marginTop: '6px' }}>{selectedProfile.bio}</p>}
@@ -396,7 +398,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                             className="friends-action-btn-secondary"
                             style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                           >
-                            Cancel Request
+                            {t('friends.cancelRequest')}
                           </button>
                         ) : (
                           <>
@@ -408,7 +410,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                               className="friends-action-btn-primary"
                               style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                             >
-                              Confirm Request
+                              {t('friends.confirm')}
                             </button>
                             <button 
                               onClick={() => {
@@ -418,7 +420,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                               className="friends-action-btn-secondary"
                               style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--panel-border)', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                             >
-                              Delete Request
+                              {t('friends.delete')}
                             </button>
                           </>
                         )}
@@ -483,7 +485,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
       {/* 3. SUGGESTIONS VIEW */}
       {activeTab === 'suggestions' && (
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>Friend Suggestions</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>{t('friends.peopleYouMayKnow')}</h1>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px', marginTop: 0 }}>People you may know based on mutual connections</p>
 
           {suggestionsLoading ? (
@@ -494,7 +496,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
           ) : suggestions.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', color: 'var(--text-muted)' }}>
               <i className="fa-solid fa-user-group" style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.3 }}></i>
-              <p style={{ margin: 0, fontSize: '14px' }}>No recommendations at the moment.</p>
+              <p style={{ margin: 0, fontSize: '14px' }}>{t('friends.noRequests')}</p>
             </div>
           ) : (
             <div className="friends-grid-list">
@@ -515,7 +517,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                       <i className="fa-solid fa-user-group" style={{ fontSize: '9px', color: 'var(--primary)' }}></i>
-                      <span>{((friend.username.charCodeAt(0) + friend.username.length) % 5) + 1} mutual friends</span>
+                      <span>{((friend.username.charCodeAt(0) + friend.username.length) % 5) + 1} {t('friends.mutualFriends')}</span>
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       @{friend.username}
@@ -526,7 +528,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                     className="friends-action-btn-primary"
                     style={{ width: '100%', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 0', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '8px' }}
                   >
-                    <i className="fa-solid fa-user-plus" style={{ fontSize: '11px' }}></i> Add Friend
+                    <i className="fa-solid fa-user-plus" style={{ fontSize: '11px' }}></i> {t('friends.addFriend')}
                   </button>
                 </div>
               ))}
@@ -540,14 +542,14 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
         <div>
           <div className="friends-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexShrink: 0 }}>
             <div>
-              <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>All Friends</h1>
+              <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>{t('friends.allFriends')}</h1>
               <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>Manage and connect with your {users.length} friend{users.length !== 1 ? 's' : ''}</p>
             </div>
             <div className="friends-search-bar" style={{ display: 'flex', alignItems: 'center', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--panel-border)', borderRadius: '12px', padding: '8px 14px', gap: '10px', width: '280px' }}>
               <i className="fa-solid fa-magnifying-glass" style={{ color: 'var(--text-muted)', fontSize: '13px' }} />
               <input
                 type="text"
-                placeholder="Search friends..."
+                placeholder={t('friends.searchFriends')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ flexGrow: 1, background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }}
@@ -581,7 +583,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                       <i className="fa-solid fa-user-group" style={{ fontSize: '9px', color: 'var(--primary)' }}></i>
-                      <span>{((friend.username.charCodeAt(0) + friend.username.length) % 5) + 1} mutual friends</span>
+                      <span>{((friend.username.charCodeAt(0) + friend.username.length) % 5) + 1} {t('friends.mutualFriends')}</span>
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       @{friend.username}
@@ -596,14 +598,14 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                       className="friends-action-btn-primary"
                       style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 0', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer' }}
                     >
-                      <i className="fa-solid fa-message"></i> Message
+                      <i className="fa-solid fa-message"></i> {t('friends.messageBtn')}
                     </button>
                     <button 
                       onClick={() => navigate(`/profile/${friend.id}`)}
                       className="friends-action-btn-secondary"
                       style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--panel-border)', borderRadius: '10px', padding: '10px 0', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer' }}
                     >
-                      <i className="fa-solid fa-user"></i> Profile
+                      <i className="fa-solid fa-user"></i> {t('friends.profileBtn')}
                     </button>
                   </div>
                 </div>
@@ -616,7 +618,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
       {/* 5. BIRTHDAYS VIEW */}
       {activeTab === 'birthdays' && (
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>Birthdays</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>{t('friends.birthdays')}</h1>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px', marginTop: 0 }}>Celebrate upcoming birthdays of your friends</p>
 
           {users.length === 0 ? (
@@ -629,10 +631,10 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
               {/* Today's birthdays block */}
               <div style={{ background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(245, 158, 11, 0.05))', border: '1px solid rgba(236, 72, 153, 0.2)', borderRadius: '20px', padding: '24px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 16px 0' }}>
-                  <i className="fa-solid fa-gift" style={{ color: '#EC4899' }}></i> Birthdays Today
+                  <i className="fa-solid fa-gift" style={{ color: '#EC4899' }}></i> {t('friends.birthdaysToday')}
                 </h3>
                 {users.filter(u => isBirthdayToday(u.username)).length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>No friends have birthdays today.</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>{t('friends.birthdaysTodayEmpty')}</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {users.filter(u => isBirthdayToday(u.username)).map((friend) => (
@@ -654,7 +656,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                           onClick={() => handleMessage(friend.id, friend.username)}
                           style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '8px 16px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                         >
-                          Wish them well
+                          {t('friends.wishWell')}
                         </button>
                       </div>
                     ))}
@@ -664,7 +666,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
 
               {/* Monthly Birthday Calendar */}
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '16px' }}>Upcoming Birthdays</h3>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '16px' }}>{t('friends.upcomingBirthdays')}</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {users.map((friend, index) => (
                     <div key={friend.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', padding: '12px 18px', borderRadius: '14px' }}>
@@ -700,7 +702,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
       {/* 6. CUSTOM LISTS VIEW */}
       {activeTab === 'lists' && (
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>Custom Lists</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>{t('friends.customLists')}</h1>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px', marginTop: 0 }}>Segment your friends into custom groups</p>
 
           {selectedList === null ? (
@@ -775,7 +777,7 @@ export function FriendsPage({ activeTab, setActiveTab, selectedRequestId }: Frie
                                 className="friends-action-btn-primary"
                                 style={{ flex: 1, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 0', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                               >
-                                Message
+                                {t('friends.messageBtn')}
                               </button>
                             </div>
                           </div>

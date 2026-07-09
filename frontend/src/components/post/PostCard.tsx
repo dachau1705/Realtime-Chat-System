@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChat } from '../../hooks/useChat';
+import { useLanguage } from '../../context/LanguageContext';
 import { useLikeMutation, useDeletePostMutation } from '../../hooks/useFeedQuery';
 import { commentOnPost, fetchPostComments, type Post, type Comment } from '../../services/api';
 
@@ -11,6 +12,7 @@ interface PostCardProps {
 
 export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { token, currentUser, showToast } = useChat();
 
   const likeMutation = useLikeMutation(token || '');
@@ -32,14 +34,14 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
   // Delete action
   const handleDeletePost = () => {
     if (!token) return;
-    if (confirm('Delete this post permanently?')) {
+    if (confirm(t('post.deleteConfirm'))) {
       deleteMutation.mutate(post.id, {
         onSuccess: () => {
-          showToast('Success', 'Post deleted successfully', false);
+          showToast(t('friends.addFriend') || 'Success', t('post.deleteSuccess'), false);
           onPostDeleted?.();
         },
         onError: (err: any) => {
-          showToast('Error', err.message || 'Failed to delete post', true);
+          showToast(t('friends.delete') || 'Error', err.message || t('post.deleteError'), true);
         }
       });
     }
@@ -52,7 +54,7 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
       const data = await fetchPostComments(token, post.id);
       setComments(data);
     } catch (err: any) {
-      showToast('Error', err.message || 'Failed to load comments', true);
+      showToast(t('friends.delete') || 'Error', err.message || 'Failed to load comments', true);
     } finally {
       setLoadingComments(false);
     }
@@ -76,12 +78,8 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
       const addedComment = await commentOnPost(token, post.id, content);
       setComments((prev) => [...prev, addedComment]);
       setNewComment('');
-      // Force refreshing the cache of feed to sync comment count
-      // Wait, we don't have to reload feed, we can let queryClient handle it or increment it
-      // Let's do inline comment count sync on queryClient if desired
-      // We can also let onSettled invalidations update the server count
     } catch (err: any) {
-      showToast('Comment Failed', err.message || 'Failed to post comment', true);
+      showToast(t('post.postCommentError'), err.message || 'Failed to post comment', true);
     } finally {
       setSubmittingComment(false);
     }
@@ -270,10 +268,10 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
       }}>
         <span>
           <i className="fa-solid fa-heart" style={{ color: 'var(--error)', marginRight: '4px' }}></i>
-          {post.reaction_count} like{post.reaction_count !== 1 ? 's' : ''}
+          {t('post.likesCount').replace('{count}', String(post.reaction_count))}
         </span>
         <span style={{ cursor: 'pointer' }} onClick={handleToggleComments}>
-          {post.comment_count} comment{post.comment_count !== 1 ? 's' : ''}
+          {t('post.commentsCount').replace('{count}', String(post.comment_count))}
         </span>
       </div>
 
@@ -303,7 +301,7 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
           }}
         >
           <i className={post.has_reacted ? 'fa-solid fa-heart' : 'fa-regular fa-heart'}></i>
-          {post.has_reacted ? 'Liked' : 'Like'}
+          {post.has_reacted ? t('post.liked') : t('post.like')}
         </button>
 
         <button
@@ -324,7 +322,7 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
           }}
         >
           <i className="fa-regular fa-message"></i>
-          Comment
+          {t('post.commentBtn')}
         </button>
       </div>
 
@@ -333,11 +331,11 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
           {loadingComments ? (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', padding: '8px' }}>
-              <i className="fa-solid fa-spinner fa-spin"></i> Loading comments...
+              <i className="fa-solid fa-spinner fa-spin"></i> {t('post.loadingComments')}
             </div>
           ) : comments.length === 0 ? (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', padding: '8px' }}>
-              No comments yet. Write one below!
+              {t('post.noComments')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '250px', overflowY: 'auto', paddingRight: '4px' }}>
@@ -387,7 +385,7 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
       <form onSubmit={handleCommentSubmit} style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
         <input
           type="text"
-          placeholder="Write a comment..."
+          placeholder={t('post.commentPlaceholder')}
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           disabled={submittingComment}
@@ -414,7 +412,7 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
             borderRadius: '10px'
           }}
         >
-          {submittingComment ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Reply'}
+          {submittingComment ? <i className="fa-solid fa-spinner fa-spin"></i> : t('post.replyBtn')}
         </button>
       </form>
     </div>

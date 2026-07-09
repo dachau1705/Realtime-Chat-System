@@ -1,5 +1,6 @@
-import { useChat } from '../hooks/useChat';
+import { useChat } from '../../hooks/useChat';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface FriendsSidebarProps {
   activeTab: 'home' | 'requests' | 'suggestions' | 'all' | 'birthdays' | 'lists';
@@ -8,6 +9,7 @@ interface FriendsSidebarProps {
 }
 
 export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: FriendsSidebarProps) {
+  const { t } = useLanguage();
   const { friendRequests, sentRequests, acceptRequest, declineRequest } = useChat();
   const navigate = useNavigate();
 
@@ -25,7 +27,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
           </button>
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.3px' }}>
-              Friend Requests
+              {t('friends.pendingRequests')}
             </h2>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
               {friendRequests.length} pending • {sentRequests.length} sent
@@ -37,11 +39,11 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
           {/* Received Requests Section */}
           <div>
             <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-              Received ({friendRequests.length})
+              {t('friends.pendingRequests')} ({friendRequests.length})
             </h3>
             {friendRequests.length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', padding: '8px 0', textAlign: 'center' }}>
-                No received requests
+                {t('friends.noRequests')}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -90,7 +92,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
                           }} 
                           style={{ flex: 1, padding: '6px 0', fontSize: '11px', fontWeight: 600, borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer' }}
                         >
-                          Confirm
+                          {t('friends.confirm')}
                         </button>
                         <button 
                           onClick={(e) => { 
@@ -100,7 +102,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
                           }} 
                           style={{ flex: 1, padding: '6px 0', fontSize: '11px', fontWeight: 600, borderRadius: '8px', border: '1px solid var(--panel-border)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', cursor: 'pointer' }}
                         >
-                          Delete
+                          {t('friends.delete')}
                         </button>
                       </div>
                     </div>
@@ -113,11 +115,11 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
           {/* Sent Requests Section */}
           <div style={{ marginTop: '12px' }}>
             <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-              Sent ({sentRequests.length})
+              {t('friends.sentRequests')} ({sentRequests.length})
             </h3>
             {sentRequests.length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', padding: '8px 0', textAlign: 'center' }}>
-                No sent requests
+                {t('friends.noRequests')}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -166,7 +168,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
                           }} 
                           style={{ flex: 1, padding: '6px 0', fontSize: '11px', fontWeight: 600, borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.08)', color: '#EF4444', cursor: 'pointer' }}
                         >
-                          Cancel Request
+                          {t('friends.cancelRequest')}
                         </button>
                       </div>
                     </div>
@@ -184,7 +186,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
     <div className="sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="sidebar-header" style={{ padding: '24px 20px 16px 20px' }}>
         <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.5px' }}>
-          Friends
+          {t('sidebar.friends')}
         </h2>
       </div>
 
@@ -194,7 +196,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
           onClick={() => setActiveTab('home')}
         >
           <i className="fa-solid fa-house" style={{ fontSize: '15px' }}></i>
-          <span>Home</span>
+          <span>{t('friends.home')}</span>
         </button>
 
         <button
@@ -202,7 +204,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
           onClick={() => setActiveTab('requests')}
         >
           <i className="fa-solid fa-user-clock" style={{ fontSize: '15px' }}></i>
-          <span>Friend Requests</span>
+          <span>{t('friends.pendingRequests')}</span>
           {friendRequests.length > 0 && (
             <span className="tab-btn-badge error-badge">
               {friendRequests.length}
@@ -215,7 +217,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
           onClick={() => setActiveTab('suggestions')}
         >
           <i className="fa-solid fa-user-plus" style={{ fontSize: '15px' }}></i>
-          <span>Suggestions</span>
+          <span>{t('friends.peopleYouMayKnow')}</span>
         </button>
 
         <button
@@ -223,7 +225,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
           onClick={() => setActiveTab('all')}
         >
           <i className="fa-solid fa-users" style={{ fontSize: '15px' }}></i>
-          <span>All Friends</span>
+          <span>{t('friends.allFriends')}</span>
         </button>
 
         <button
@@ -231,7 +233,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
           onClick={() => setActiveTab('birthdays')}
         >
           <i className="fa-solid fa-cake-candles" style={{ fontSize: '15px' }}></i>
-          <span>Birthdays</span>
+          <span>{t('friends.birthdays')}</span>
         </button>
 
         <button
@@ -239,7 +241,7 @@ export function FriendsSidebar({ activeTab, setActiveTab, selectedRequestId }: F
           onClick={() => setActiveTab('lists')}
         >
           <i className="fa-solid fa-list-ul" style={{ fontSize: '15px' }}></i>
-          <span>Custom Lists</span>
+          <span>{t('friends.customLists')}</span>
         </button>
       </div>
     </div>

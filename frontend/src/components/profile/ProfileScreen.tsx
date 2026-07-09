@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useChat } from '../hooks/useChat';
-import { PostCard } from './post/PostCard';
+import { useChat } from '../../hooks/useChat';
+import { PostCard } from '../post/PostCard';
+import { useLanguage } from '../../context/LanguageContext';
 import { 
   fetchUserProfile, 
   updateUserProfile, 
@@ -12,9 +13,10 @@ import {
   type UserProfile,
   type UserFriend,
   type Post
-} from '../services/api';
+} from '../../services/api';
 
 export function ProfileScreen() {
+  const { t } = useLanguage();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { 
@@ -146,11 +148,11 @@ export function ProfileScreen() {
     try {
       setActionLoading(true);
       await uploadAvatar(token, file);
-      showToast('Success', 'Profile avatar updated successfully', false);
+      showToast(t('friends.addFriend') || 'Success', t('profile.avatarSuccess'), false);
       // Reload profile to lock in backend public URL
       await loadProfile();
     } catch (err: any) {
-      showToast('Error', err.message || 'Failed to upload avatar', true);
+      showToast(t('friends.delete') || 'Error', err.message || 'Failed to upload avatar', true);
       await loadProfile(); // revert preview
     } finally {
       setActionLoading(false);
@@ -173,10 +175,10 @@ export function ProfileScreen() {
     try {
       setActionLoading(true);
       await uploadCover(token, file);
-      showToast('Success', 'Cover banner updated successfully', false);
+      showToast(t('friends.addFriend') || 'Success', t('profile.coverSuccess'), false);
       await loadProfile();
     } catch (err: any) {
-      showToast('Error', err.message || 'Failed to upload cover banner', true);
+      showToast(t('friends.delete') || 'Error', err.message || 'Failed to upload cover banner', true);
       await loadProfile(); // revert preview
     } finally {
       setActionLoading(false);
@@ -195,10 +197,10 @@ export function ProfileScreen() {
         privacy_is_public: formData.privacy_is_public
       });
       setProfile(updated);
-      showToast('Success', 'Profile updated successfully', false);
+      showToast(t('friends.addFriend') || 'Success', t('profile.profileSuccess'), false);
       setEditModalOpen(false);
     } catch (err: any) {
-      showToast('Error', err.message || 'Failed to update profile', true);
+      showToast(t('friends.delete') || 'Error', err.message || 'Failed to update profile', true);
     } finally {
       setActionLoading(false);
     }
@@ -209,10 +211,10 @@ export function ProfileScreen() {
     try {
       setActionLoading(true);
       const message = await addFriend(profile.email || '');
-      showToast('Friend Request', message, false);
+      showToast(t('profile.friendRequestSent'), message, false);
       await loadProfile();
     } catch (err: any) {
-      showToast('Error', err.message || 'Failed to send friend request', true);
+      showToast(t('friends.delete') || 'Error', err.message || 'Failed to send friend request', true);
     } finally {
       setActionLoading(false);
     }
@@ -223,10 +225,10 @@ export function ProfileScreen() {
     try {
       setActionLoading(true);
       await acceptRequest(profile.id);
-      showToast('Friend Request Accepted', `You are now friends with ${profile.username}`, false);
+      showToast(t('profile.friendRequestAccepted'), t('profile.nowFriends').replace('{name}', profile.username), false);
       await loadProfile();
     } catch (err: any) {
-      showToast('Error', err.message || 'Failed to accept request', true);
+      showToast(t('friends.delete') || 'Error', err.message || 'Failed to accept request', true);
     } finally {
       setActionLoading(false);
     }
@@ -237,10 +239,10 @@ export function ProfileScreen() {
     try {
       setActionLoading(true);
       await declineRequest(profile.id);
-      showToast('Friend Request Declined', `Declined friend request from ${profile.username}`, false);
+      showToast(t('profile.friendRequestDeclined'), `Declined friend request from ${profile.username}`, false);
       await loadProfile();
     } catch (err: any) {
-      showToast('Error', err.message || 'Failed to decline request', true);
+      showToast(t('friends.delete') || 'Error', err.message || 'Failed to decline request', true);
     } finally {
       setActionLoading(false);
     }
@@ -253,7 +255,7 @@ export function ProfileScreen() {
       await startChatWithUser(profile.id, profile.username);
       navigate('/chat');
     } catch (err: any) {
-      showToast('Error', err.message || 'Failed to start chat', true);
+      showToast(t('friends.delete') || 'Error', err.message || 'Failed to start chat', true);
     } finally {
       setActionLoading(false);
     }
@@ -264,7 +266,7 @@ export function ProfileScreen() {
       <div className="profile-container loading">
         <div className="profile-spinner">
           <i className="fa-solid fa-spinner fa-spin"></i>
-          <p>Loading user profile...</p>
+          <p>{t('profile.loadingProfile')}</p>
         </div>
       </div>
     );
@@ -275,10 +277,10 @@ export function ProfileScreen() {
       <div className="profile-container error">
         <div className="profile-error-card">
           <i className="fa-solid fa-triangle-exclamation"></i>
-          <h3>Error Loading Profile</h3>
-          <p>{error || 'User profile not found'}</p>
+          <h3>{t('profile.errorLoading')}</h3>
+          <p>{error || t('profile.profileNotFound')}</p>
           <button className="primary-btn" onClick={() => navigate('/')}>
-            Back to Chats
+            {t('profile.backToChats')}
           </button>
         </div>
       </div>
@@ -331,7 +333,7 @@ export function ProfileScreen() {
               onClick={() => coverInputRef.current?.click()}
               title="Change cover photo"
             >
-              <i className="fa-solid fa-camera"></i> <span>Edit Cover</span>
+              <i className="fa-solid fa-camera"></i> <span>{t('profile.editCover')}</span>
             </button>
           )}
         </div>
@@ -366,7 +368,7 @@ export function ProfileScreen() {
             {profile.bio && <p className="profile-bio-text">{profile.bio}</p>}
             {!isOwner && mutualFriendsCount > 0 && (
               <p className="profile-mutual-friends-tag" style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-                <i className="fa-solid fa-users" style={{ color: 'var(--primary)' }}></i> {mutualFriendsCount} mutual friend{mutualFriendsCount > 1 ? 's' : ''}
+                <i className="fa-solid fa-users" style={{ color: 'var(--primary)' }}></i> {t('profile.mutualFriendsCount').replace('{count}', String(mutualFriendsCount))}
               </p>
             )}
           </div>
@@ -374,33 +376,33 @@ export function ProfileScreen() {
           <div className="profile-header-actions">
             {isOwner ? (
               <button className="primary-btn edit-profile-btn" onClick={() => setEditModalOpen(true)}>
-                <i className="fa-solid fa-pen"></i> Edit Profile
+                <i className="fa-solid fa-pen"></i> {t('profile.editProfile')}
               </button>
             ) : (
               <div className="profile-action-group">
                 {profile.friendshipStatus === 'none' && (
                   <button className="primary-btn" onClick={handleAddFriend} disabled={actionLoading}>
-                    {actionLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-user-plus"></i> Add Friend</>}
+                    {actionLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-user-plus"></i> {t('profile.addFriend')}</>}
                   </button>
                 )}
                 {profile.friendshipStatus === 'request_sent' && (
                   <button className="primary-btn disabled-btn" disabled>
-                    <i className="fa-solid fa-hourglass-half"></i> Pending
+                    <i className="fa-solid fa-hourglass-half"></i> {t('profile.pending')}
                   </button>
                 )}
                 {profile.friendshipStatus === 'request_received' && (
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button className="primary-btn success-btn" onClick={handleAcceptRequest} disabled={actionLoading}>
-                      Accept
+                      {t('profile.accept')}
                     </button>
                     <button className="primary-btn decline-btn" onClick={handleDeclineRequest} disabled={actionLoading}>
-                      Decline
+                      {t('profile.decline')}
                     </button>
                   </div>
                 )}
                 {(profile.friendshipStatus === 'friends' || profile.friendshipStatus === 'self') && (
                   <button className="primary-btn message-btn" onClick={handleStartChat} disabled={actionLoading}>
-                    <i className="fa-solid fa-message"></i> Message
+                    <i className="fa-solid fa-message"></i> {t('profile.message')}
                   </button>
                 )}
               </div>
@@ -414,21 +416,21 @@ export function ProfileScreen() {
             className={`profile-tab-link ${activeTab === 'about' ? 'active' : ''}`}
             onClick={() => setActiveTab('about')}
           >
-            About
+            {t('profile.about')}
           </button>
           {!profile.is_redacted && (
             <button 
               className={`profile-tab-link ${activeTab === 'friends' ? 'active' : ''}`}
               onClick={() => setActiveTab('friends')}
             >
-              Friends
+              {t('profile.friends')}
             </button>
           )}
           <button 
             className={`profile-tab-link ${activeTab === 'activity' ? 'active' : ''}`}
             onClick={() => setActiveTab('activity')}
           >
-            Activity
+            {t('profile.activity')}
           </button>
         </div>
 
@@ -436,49 +438,49 @@ export function ProfileScreen() {
         <div className="profile-tab-panel">
           {activeTab === 'about' && (
             <div className="tab-about-content">
-              <div className="about-info-grid">
-                <div className="about-info-item">
-                  <div className="about-info-icon"><i className="fa-solid fa-circle-user"></i></div>
-                  <div className="about-info-value">
-                    <span className="info-title">Full Name</span>
-                    <span className="info-desc">{profile.full_name || 'Not provided'}</span>
-                  </div>
-                </div>
+               <div className="about-info-grid">
+                 <div className="about-info-item">
+                   <div className="about-info-icon"><i className="fa-solid fa-circle-user"></i></div>
+                   <div className="about-info-value">
+                     <span className="info-title">{t('profile.fullName')}</span>
+                     <span className="info-desc">{profile.full_name || t('profile.notProvided')}</span>
+                   </div>
+                 </div>
 
-                <div className="about-info-item">
-                  <div className="about-info-icon"><i className="fa-solid fa-envelope"></i></div>
-                  <div className="about-info-value">
-                    <span className="info-title">Email Address</span>
-                    <span className="info-desc">{profile.email || 'Private / Hidden'}</span>
-                  </div>
-                </div>
+                 <div className="about-info-item">
+                   <div className="about-info-icon"><i className="fa-solid fa-envelope"></i></div>
+                   <div className="about-info-value">
+                     <span className="info-title">{t('profile.emailAddress')}</span>
+                     <span className="info-desc">{profile.email || t('profile.privateHidden')}</span>
+                   </div>
+                 </div>
 
-                <div className="about-info-item">
-                  <div className="about-info-icon"><i className="fa-solid fa-phone"></i></div>
-                  <div className="about-info-value">
-                    <span className="info-title">Phone Number</span>
-                    <span className="info-desc">{profile.phone || 'Not provided'}</span>
-                  </div>
-                </div>
+                 <div className="about-info-item">
+                   <div className="about-info-icon"><i className="fa-solid fa-phone"></i></div>
+                   <div className="about-info-value">
+                     <span className="info-title">{t('profile.phoneNumber')}</span>
+                     <span className="info-desc">{profile.phone || t('profile.notProvided')}</span>
+                   </div>
+                 </div>
 
-                <div className="about-info-item">
-                  <div className="about-info-icon"><i className="fa-solid fa-calendar-days"></i></div>
-                  <div className="about-info-value">
-                    <span className="info-title">Joined Date</span>
-                    <span className="info-desc">{formattedDate}</span>
-                  </div>
-                </div>
+                 <div className="about-info-item">
+                   <div className="about-info-icon"><i className="fa-solid fa-calendar-days"></i></div>
+                   <div className="about-info-value">
+                     <span className="info-title">{t('profile.joinedDate')}</span>
+                     <span className="info-desc">{formattedDate}</span>
+                   </div>
+                 </div>
 
-                <div className="about-info-item">
-                  <div className="about-info-icon"><i className="fa-solid fa-earth-americas"></i></div>
-                  <div className="about-info-value">
-                    <span className="info-title">Privacy Level</span>
-                    <span className="info-desc">
-                      {profile.privacy_is_public ? 'Public profile' : 'Private (Friends only)'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                 <div className="about-info-item">
+                   <div className="about-info-icon"><i className="fa-solid fa-earth-americas"></i></div>
+                   <div className="about-info-value">
+                     <span className="info-title">{t('profile.privacyLevel')}</span>
+                     <span className="info-desc">
+                       {profile.privacy_is_public ? t('profile.publicProfile') : t('profile.privateFriendsOnly')}
+                     </span>
+                   </div>
+                 </div>
+               </div>
             </div>
           )}
 
@@ -486,10 +488,10 @@ export function ProfileScreen() {
             <div className="tab-friends-content">
               {friendsLoading ? (
                 <div className="tab-panel-loader">
-                  <i className="fa-solid fa-spinner fa-spin"></i> Loading friends...
+                  <i className="fa-solid fa-spinner fa-spin"></i> {t('profile.loadingFriends')}
                 </div>
               ) : friends.length === 0 ? (
-                <div className="tab-panel-empty">No friends list to show.</div>
+                <div className="tab-panel-empty">{t('profile.noFriendsShow')}</div>
               ) : (
                 <div className="friends-grid-list">
                   {friends.map((friend) => (
@@ -507,8 +509,8 @@ export function ProfileScreen() {
                       )}
                       <div className="friend-card-info">
                         <div className="friend-card-name">{friend.full_name || friend.username}</div>
-                        <div className="friend-card-sub text-muted">
-                          {friend.is_mutual ? 'Mutual Friend' : `@${friend.username}`}
+                        <div className="friend-card-sub style-muted">
+                          {friend.is_mutual ? t('profile.mutualFriend') : `@${friend.username}`}
                         </div>
                       </div>
                     </div>
@@ -522,14 +524,14 @@ export function ProfileScreen() {
             <div className="tab-activity-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {postsLoading ? (
                 <div className="tab-panel-loader">
-                  <i className="fa-solid fa-spinner fa-spin"></i> Loading user posts...
+                  <i className="fa-solid fa-spinner fa-spin"></i> {t('profile.loadingPosts')}
                 </div>
               ) : userPosts.length === 0 ? (
                 <div className="activity-timeline">
                   <div className="activity-item">
                     <div className="activity-dot"></div>
                     <div className="activity-details">
-                      <span className="activity-title">Account Created</span>
+                      <span className="activity-title">{t('profile.accountCreated')}</span>
                       <span className="activity-time">{formattedDate}</span>
                     </div>
                   </div>
@@ -537,7 +539,7 @@ export function ProfileScreen() {
                     <div className="activity-item">
                       <div className="activity-dot active"></div>
                       <div className="activity-details">
-                        <span className="activity-title">Active Connection status</span>
+                        <span className="activity-title">{t('profile.activeConnectionStatus')}</span>
                         <span className="activity-time">
                           {profile.friendshipStatus === 'self' ? 'Fully authenticated' : `Status: ${profile.friendshipStatus}`}
                         </span>
@@ -561,12 +563,12 @@ export function ProfileScreen() {
       {editModalOpen && (
         <div className="modal" onClick={() => setEditModalOpen(false)}>
           <div className="modal-content profile-edit-form" onClick={(e) => e.stopPropagation()}>
-            <h1>Edit Profile Info</h1>
-            <p>Update your display name, biography and security options.</p>
+            <h1>{t('profile.editProfileInfo')}</h1>
+            <p>{t('profile.editProfileDesc')}</p>
             
             <form onSubmit={handleEditSubmit} className="setup-options">
               <div className="form-group">
-                <label>Full Display Name</label>
+                <label>{t('profile.fullDisplayName')}</label>
                 <input 
                   type="text" 
                   className="form-input" 
@@ -578,7 +580,7 @@ export function ProfileScreen() {
               </div>
 
               <div className="form-group">
-                <label>Phone Number</label>
+                <label>{t('profile.phoneNumber')}</label>
                 <input 
                   type="text" 
                   className="form-input" 
@@ -590,7 +592,7 @@ export function ProfileScreen() {
               </div>
 
               <div className="form-group">
-                <label>Biography / Status Bio</label>
+                <label>{t('profile.biography')}</label>
                 <textarea 
                   className="form-input" 
                   value={formData.bio} 
@@ -611,16 +613,16 @@ export function ProfileScreen() {
                   style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                 />
                 <label htmlFor="privacy_toggle" style={{ margin: 0, cursor: 'pointer' }}>
-                  Make profile public (visible to everyone)
+                  {t('profile.makePublic')}
                 </label>
               </div>
 
               <div className="action-button-group" style={{ marginTop: '24px' }}>
                 <button type="submit" className="primary-btn" disabled={actionLoading}>
-                  {actionLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Save Changes'}
+                  {actionLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : t('profile.saveChanges')}
                 </button>
                 <button type="button" className="primary-btn decline-btn" onClick={() => setEditModalOpen(false)}>
-                  Cancel
+                  {t('profile.cancel')}
                 </button>
               </div>
             </form>

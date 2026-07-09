@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useChat } from '../hooks/useChat';
+import { useChat } from '../../hooks/useChat';
+import { useLanguage } from '../../context/LanguageContext';
 
 export function Sidebar() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [friendEmail, setFriendEmail] = useState<string>('');
   const [adding, setAdding] = useState<boolean>(false);
   const [addResultMsg, setAddResultMsg] = useState<{ text: string; isError: boolean } | null>(null);
@@ -125,7 +127,7 @@ export function Sidebar() {
             navigate('/');
           }}
         >
-          <i className="fa-solid fa-square-rss"></i> Feed
+          <i className="fa-solid fa-square-rss"></i> {t('sidebar.feed')}
           {unreadNotifCount > 0 && (
             <span className="tab-btn-badge primary-badge">
               {unreadNotifCount}
@@ -139,7 +141,7 @@ export function Sidebar() {
             navigate('/chat');
           }}
         >
-          <i className="fa-solid fa-message"></i> Chats
+          <i className="fa-solid fa-message"></i> {t('sidebar.chats')}
           {Object.values(unreadBadges).reduce((a, b) => a + b, 0) > 0 && (
             <span className="tab-btn-badge error-badge">
               {Object.values(unreadBadges).reduce((a, b) => a + b, 0)}
@@ -153,7 +155,7 @@ export function Sidebar() {
             navigate('/friends');
           }}
         >
-          <i className="fa-solid fa-users"></i> Friends
+          <i className="fa-solid fa-users"></i> {t('sidebar.friends')}
         </button>
         <button
           className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
@@ -162,7 +164,7 @@ export function Sidebar() {
             navigate('/friends/requests');
           }}
         >
-          <i className="fa-solid fa-user-plus"></i> Requests
+          <i className="fa-solid fa-user-plus"></i> {t('sidebar.requests')}
           {friendRequests.length > 0 && (
             <span className="tab-btn-badge error-badge">
               {friendRequests.length}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useChat } from '../hooks/useChat';
+import { useChat } from '../../hooks/useChat';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   useGetPageDetail,
   useGetPagePosts,
@@ -15,7 +16,7 @@ import {
   deletePageMemberApi,
   createPageReviewApi,
   updatePageSettingsApi
-} from '../utils/api';
+} from '../../utils/api';
 
 interface PageProfile {
   id: string;
@@ -95,6 +96,7 @@ interface PageInsights {
 export function PageDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { token, showToast } = useChat();
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -250,7 +252,7 @@ export function PageDetail() {
   if (loading) {
     return (
       <div className="profile-container loading" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <div className="profile-spinner"><i className="fa-solid fa-spinner fa-spin" /><span>Loading Page Profile...</span></div>
+        <div className="profile-spinner"><i className="fa-solid fa-spinner fa-spin" /><span>{t('pages.loadingPage')}</span></div>
       </div>
     );
   }
@@ -260,9 +262,9 @@ export function PageDetail() {
       <div className="profile-container error" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <div className="profile-error-card">
           <i className="fa-solid fa-circle-exclamation" />
-          <h3>Page Not Found</h3>
-          <p>The Page profile you are looking for does not exist or has been deleted.</p>
-          <button className="primary-btn" onClick={() => navigate('/')}>Return Home</button>
+          <h3>{t('pages.pageNotFound')}</h3>
+          <p>{t('pages.pageNotFoundDesc')}</p>
+          <button className="primary-btn" onClick={() => navigate('/')}>{t('pages.returnHome')}</button>
         </div>
       </div>
     );
@@ -307,7 +309,7 @@ export function PageDetail() {
           <div className="profile-header-actions">
             <div className="profile-action-group">
               <button className={`primary-btn ${page.isFollowing ? 'edit-profile-btn' : ''}`} onClick={handleFollowToggle}>
-                {page.isFollowing ? 'Unfollow' : 'Follow Page'}
+                {page.isFollowing ? t('pages.unfollow') : t('pages.follow')}
               </button>
             </div>
           </div>
@@ -315,17 +317,17 @@ export function PageDetail() {
 
         {/* Tab Navigation */}
         <div className="profile-tabs-nav">
-          <button className={`profile-tab-link ${activeTab === 'posts' ? 'active' : ''}`} onClick={() => setActiveTab('posts')}>Posts</button>
-          <button className={`profile-tab-link ${activeTab === 'about' ? 'active' : ''}`} onClick={() => setActiveTab('about')}>About</button>
-          <button className={`profile-tab-link ${activeTab === 'reviews' ? 'active' : ''}`} onClick={() => setActiveTab('reviews')}>Reviews ({page.review_count})</button>
+          <button className={`profile-tab-link ${activeTab === 'posts' ? 'active' : ''}`} onClick={() => setActiveTab('posts')}>{t('pages.posts')}</button>
+          <button className={`profile-tab-link ${activeTab === 'about' ? 'active' : ''}`} onClick={() => setActiveTab('about')}>{t('pages.about')}</button>
+          <button className={`profile-tab-link ${activeTab === 'reviews' ? 'active' : ''}`} onClick={() => setActiveTab('reviews')}>{t('pages.reviews')} ({page.review_count})</button>
           
           {isStaff && (
-            <button className={`profile-tab-link ${activeTab === 'insights' ? 'active' : ''}`} onClick={() => setActiveTab('insights')}>Insights</button>
+            <button className={`profile-tab-link ${activeTab === 'insights' ? 'active' : ''}`} onClick={() => setActiveTab('insights')}>{t('pages.insights')}</button>
           )}
           {isAdmin && (
             <>
-              <button className={`profile-tab-link ${activeTab === 'members' ? 'active' : ''}`} onClick={() => setActiveTab('members')}>Members</button>
-              <button className={`profile-tab-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>Settings</button>
+              <button className={`profile-tab-link ${activeTab === 'members' ? 'active' : ''}`} onClick={() => setActiveTab('members')}>{t('pages.members')}</button>
+              <button className={`profile-tab-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>{t('pages.settings')}</button>
             </>
           )}
         </div>
@@ -356,7 +358,7 @@ export function PageDetail() {
                 <div className="about-info-item">
                   <div className="about-info-icon"><i className="fa-solid fa-phone" /></div>
                   <div className="about-info-value">
-                    <span className="info-title">Phone</span>
+                    <span className="info-title">{t('pages.phoneNumber')}</span>
                     <span className="info-desc">{page.phone}</span>
                   </div>
                 </div>
@@ -374,7 +376,7 @@ export function PageDetail() {
                 <div className="about-info-item">
                   <div className="about-info-icon"><i className="fa-solid fa-map-pin" /></div>
                   <div className="about-info-value">
-                    <span className="info-title">Location</span>
+                    <span className="info-title">{t('pages.physicalAddress')}</span>
                     <span className="info-desc">{page.location}</span>
                   </div>
                 </div>
@@ -398,7 +400,7 @@ export function PageDetail() {
                 <div className="create-post-box shadow-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--panel-border)', borderRadius: '16px' }}>
                   <form onSubmit={handleCreatePost} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <textarea
-                      placeholder={`Publish something as ${page.page_name}...`}
+                      placeholder={t('pages.publishAs').replace('{name}', page.page_name)}
                       value={newPostContent}
                       onChange={(e) => setNewPostContent(e.target.value)}
                       style={{ width: '100%', height: '80px', background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-main)', fontSize: '13.5px', resize: 'none' }}
@@ -406,7 +408,7 @@ export function PageDetail() {
                     />
                     <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--panel-border)', paddingTop: '10px' }}>
                       <button type="submit" disabled={actionLoading} className="primary-btn" style={{ width: 'auto', padding: '6px 16px', borderRadius: '8px' }}>
-                        {actionLoading ? <i className="fa-solid fa-spinner fa-spin" /> : 'Publish Post'}
+                        {actionLoading ? <i className="fa-solid fa-spinner fa-spin" /> : t('pages.publishBtn')}
                       </button>
                     </div>
                   </form>
@@ -415,7 +417,7 @@ export function PageDetail() {
 
               {/* Feed */}
               {posts.length === 0 ? (
-                <div className="tab-panel-empty">No posts on this Page feed yet.</div>
+                <div className="tab-panel-empty">{t('pages.noPosts')}</div>
               ) : (
                 posts.map(post => (
                   <div key={post.id} className="post-card post-card-premium" style={{ border: '1px solid var(--panel-border)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -447,10 +449,10 @@ export function PageDetail() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '16px', border: '1px solid var(--panel-border)' }}>
                 <div style={{ textAlign: 'center', borderRight: '1px solid var(--panel-border)', paddingRight: '20px' }}>
                   <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-main)' }}>{page.rating}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>out of 5 stars</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{t('pages.outOfStars')}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-main)' }}>Community Reviews</div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-main)' }}>{t('pages.communityReviews')}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Total of {page.review_count} community reviews submitted.</div>
                 </div>
               </div>
@@ -458,7 +460,7 @@ export function PageDetail() {
               {/* Submit Review Box */}
               <div className="create-post-box shadow-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--panel-border)', borderRadius: '16px' }}>
                 <form onSubmit={handleSubmitReview} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--text-main)' }}>Submit Your Review</div>
+                  <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--text-main)' }}>{t('pages.submitReview')}</div>
                   
                   {/* Rating Stars Select */}
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -472,11 +474,11 @@ export function PageDetail() {
                         <i className={`fa-star ${star <= newRating ? 'fa-solid' : 'fa-regular'}`} style={{ color: star <= newRating ? '#F59E0B' : 'var(--text-muted)', fontSize: '20px' }} />
                       </button>
                     ))}
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>({newRating} Stars)</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>{t('pages.ratingStars').replace('{stars}', String(newRating))}</span>
                   </div>
 
                   <textarea
-                    placeholder="Tell others about your experience..."
+                    placeholder={t('pages.tellExperience')}
                     value={newReviewText}
                     onChange={(e) => setNewReviewText(e.target.value)}
                     style={{ width: '100%', height: '80px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--panel-border)', borderRadius: '10px', padding: '10px', color: 'var(--text-main)', fontSize: '13px', outline: 'none', resize: 'none' }}
@@ -485,7 +487,7 @@ export function PageDetail() {
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button type="submit" disabled={actionLoading} className="primary-btn" style={{ width: 'auto', padding: '6px 16px', borderRadius: '8px' }}>
-                      {actionLoading ? <i className="fa-solid fa-spinner fa-spin" /> : 'Submit Review'}
+                      {actionLoading ? <i className="fa-solid fa-spinner fa-spin" /> : t('pages.submitReviewBtn')}
                     </button>
                   </div>
                 </form>
@@ -493,7 +495,7 @@ export function PageDetail() {
 
               {/* Reviews List */}
               {reviews.length === 0 ? (
-                <div className="tab-panel-empty">No reviews submitted yet. Be the first to review!</div>
+                <div className="tab-panel-empty">{t('pages.noReviews')}</div>
               ) : (
                 reviews.map(rev => (
                   <div key={rev.id} style={{ display: 'flex', gap: '12px', padding: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--panel-border)', borderRadius: '16px' }}>
@@ -530,7 +532,7 @@ export function PageDetail() {
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '16px', border: '1px solid var(--panel-border)' }}>
                 <form onSubmit={handleAssignRole} style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
                   <div style={{ flexGrow: 1, minWidth: '220px' }}>
-                    <label className="info-title" style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Add Staff Email Address</label>
+                    <label className="info-title" style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>{t('pages.addStaffEmail')}</label>
                     <input
                       type="email"
                       placeholder="e.g. member@email.com"
@@ -541,7 +543,7 @@ export function PageDetail() {
                     />
                   </div>
                   <div style={{ width: '140px' }}>
-                    <label className="info-title" style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Role</label>
+                    <label className="info-title" style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>{t('pages.role')}</label>
                     <select
                       value={assignRole}
                       onChange={(e) => setAssignRole(e.target.value)}
@@ -555,7 +557,7 @@ export function PageDetail() {
                     </select>
                   </div>
                   <button type="submit" disabled={actionLoading} className="primary-btn" style={{ width: 'auto', padding: '8px 20px', borderRadius: '8px', height: '36px' }}>
-                    Assign
+                    {t('pages.assign')}
                   </button>
                 </form>
               </div>
@@ -604,7 +606,7 @@ export function PageDetail() {
                       onChange={(e) => setSettings({ ...settings, allow_visitor_posts: e.target.checked })}
                       style={{ cursor: 'pointer' }}
                     />
-                    Allow Visitor Posts on Page
+                    {t('pages.allowVisitorPosts')}
                   </label>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13.5px', color: 'var(--text-main)', cursor: 'pointer' }}>
@@ -614,7 +616,7 @@ export function PageDetail() {
                       onChange={(e) => setSettings({ ...settings, allow_tagging: e.target.checked })}
                       style={{ cursor: 'pointer' }}
                     />
-                    Allow Tagging on page elements
+                    {t('pages.allowTagging')}
                   </label>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13.5px', color: 'var(--text-main)', cursor: 'pointer' }}>
@@ -624,11 +626,11 @@ export function PageDetail() {
                       onChange={(e) => setSettings({ ...settings, allow_mentions: e.target.checked })}
                       style={{ cursor: 'pointer' }}
                     />
-                    Allow @Mentions from visitors
+                    {t('pages.allowMentions')}
                   </label>
 
                   <div style={{ marginTop: '10px' }}>
-                    <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Profanity Filter Level</label>
+                    <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.profanityFilter')}</label>
                     <select
                       value={settings.profanity_filter_level}
                       onChange={(e) => setSettings({ ...settings, profanity_filter_level: e.target.value as any })}
@@ -641,7 +643,7 @@ export function PageDetail() {
                   </div>
 
                   <div>
-                    <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Age Restriction</label>
+                    <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.ageRestriction')}</label>
                     <input
                       type="number"
                       value={settings.age_restriction}
@@ -659,12 +661,12 @@ export function PageDetail() {
                       onChange={(e) => setSettings({ ...settings, auto_reply_enabled: e.target.checked })}
                       style={{ cursor: 'pointer' }}
                     />
-                    Enable Auto Reply Message helper
+                    {t('pages.enableAutoReply')}
                   </label>
 
                   {settings.auto_reply_enabled && (
                     <div>
-                      <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Auto Reply Message Content</label>
+                      <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.autoReplyContent')}</label>
                       <textarea
                         value={settings.auto_reply_message || ''}
                         onChange={(e) => setSettings({ ...settings, auto_reply_message: e.target.value })}
@@ -676,7 +678,7 @@ export function PageDetail() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--panel-border)', paddingTop: '16px' }}>
                   <button type="submit" disabled={actionLoading} className="primary-btn" style={{ width: 'auto', padding: '10px 24px', borderRadius: '10px' }}>
-                    {actionLoading ? <i className="fa-solid fa-spinner fa-spin" /> : 'Save Settings'}
+                    {actionLoading ? <i className="fa-solid fa-spinner fa-spin" /> : t('pages.saveSettings')}
                   </button>
                 </div>
               </form>
@@ -690,7 +692,7 @@ export function PageDetail() {
               {/* Core analytics card figures */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '16px', border: '1px solid var(--panel-border)' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Weekly Page Reach</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('pages.weeklyReach')}</div>
                   <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--primary)', marginTop: '8px' }}>{insights.reach.toLocaleString()}</div>
                   <div style={{ fontSize: '11px', color: 'var(--success)', marginTop: '4px' }}><i className="fa-solid fa-arrow-trend-up" /> +14.2% from last week</div>
                 </div>
@@ -713,7 +715,7 @@ export function PageDetail() {
 
               {/* Demographics split */}
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '16px', border: '1px solid var(--panel-border)' }}>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '16px' }}>Audience Demographics</div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '16px' }}>{t('pages.audienceDemo')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {insights.demographics.map((demo, idx) => (
                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

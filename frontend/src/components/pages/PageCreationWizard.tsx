@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useChat } from '../hooks/useChat';
-import { useGetPageCategories, createPageApi } from '../utils/api';
+import { useChat } from '../../hooks/useChat';
+import { useGetPageCategories, createPageApi } from '../../utils/api';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface Category {
   id: string;
@@ -11,6 +12,7 @@ interface Category {
 
 export default function PageCreationWizard() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { token, showToast } = useChat();
 
   const categories = useGetPageCategories({ enabled: !!token }) as any as Category[];
@@ -44,15 +46,15 @@ export default function PageCreationWizard() {
     e.preventDefault();
     if (currentStep === 1) {
       if (!pageName.trim() || pageName.trim().length < 3) {
-        showToast('Validation Error', 'Page name must be at least 3 characters.', true);
+        showToast(t('friends.addFriend') || 'Validation Error', 'Page name must be at least 3 characters.', true);
         return;
       }
       if (!username.trim() || username.trim().length < 3) {
-        showToast('Validation Error', 'Username handle must be at least 3 characters.', true);
+        showToast(t('friends.addFriend') || 'Validation Error', 'Username handle must be at least 3 characters.', true);
         return;
       }
       if (!categoryId) {
-        showToast('Validation Error', 'Please select a page category.', true);
+        showToast(t('friends.addFriend') || 'Validation Error', 'Please select a page category.', true);
         return;
       }
     }
@@ -86,13 +88,13 @@ export default function PageCreationWizard() {
       const res = await createPageApi(payload);
 
       if (res.data && res.data.status !== false) {
-        showToast('Success', 'Your Fanpage was created successfully!', false);
+        showToast(t('pages.success'), t('pages.successDesc'), false);
         navigate(`/pages/${res.data.id}`);
       } else {
-        showToast('Creation Failed', res.data.mess || 'Check fields and try again.', true);
+        showToast(t('pages.fail'), res.data.mess || 'Check fields and try again.', true);
       }
     } catch (err: any) {
-      showToast('Network Error', err.message || 'Failed to submit form.', true);
+      showToast(t('pages.networkError'), err.message || 'Failed to submit form.', true);
     } finally {
       setSubmitting(false);
     }
@@ -105,8 +107,8 @@ export default function PageCreationWizard() {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--panel-border)', paddingBottom: '16px' }}>
           <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-main)' }}>Create Page Wizard</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>Build your local business, brand, or community page</p>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-main)' }}>{t('pages.createWizardTitle')}</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>{t('pages.createWizardDesc')}</p>
           </div>
           <button className="profile-back-btn" style={{ position: 'static' }} onClick={() => navigate('/')}>
             <i className="fa-solid fa-xmark" />
@@ -119,7 +121,7 @@ export default function PageCreationWizard() {
             <div style={{ width: `${(currentStep / totalSteps) * 100}%`, height: '100%', background: 'var(--primary)', transition: 'width 0.3s ease' }} />
           </div>
           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', minWidth: '60px', textAlign: 'right' }}>
-            Step {currentStep} of {totalSteps}
+            {t('pages.stepOf').replace('{current}', String(currentStep)).replace('{total}', String(totalSteps))}
           </span>
         </div>
 
@@ -129,7 +131,7 @@ export default function PageCreationWizard() {
           {currentStep === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Page Name (Required)</label>
+                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.pageNameReq')}</label>
                 <input
                   type="text"
                   placeholder="e.g. Antigravity AI Solutions"
@@ -141,7 +143,7 @@ export default function PageCreationWizard() {
               </div>
 
               <div>
-                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Username Handle (Required)</label>
+                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.usernameReq')}</label>
                 <input
                   type="text"
                   placeholder="e.g. antigravity.ai"
@@ -153,9 +155,9 @@ export default function PageCreationWizard() {
               </div>
 
               <div>
-                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Category (Required)</label>
+                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.categoryReq')}</label>
                 {loadingCategories ? (
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Loading categories...</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('pages.loadingCategories')}</div>
                 ) : (
                   <select
                     value={categoryId}
@@ -170,7 +172,7 @@ export default function PageCreationWizard() {
               </div>
 
               <div>
-                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>About Description</label>
+                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.aboutDesc')}</label>
                 <textarea
                   placeholder="Describe what your page does..."
                   value={description}
@@ -185,7 +187,7 @@ export default function PageCreationWizard() {
           {currentStep === 2 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Contact Email</label>
+                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.contactEmail')}</label>
                 <input
                   type="email"
                   placeholder="e.g. contact@antigravity.com"
@@ -196,7 +198,7 @@ export default function PageCreationWizard() {
               </div>
 
               <div>
-                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Phone Number</label>
+                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.phoneNumber')}</label>
                 <input
                   type="tel"
                   placeholder="e.g. +1 555-0199"
@@ -207,7 +209,7 @@ export default function PageCreationWizard() {
               </div>
 
               <div>
-                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Website URL</label>
+                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.websiteUrl')}</label>
                 <input
                   type="url"
                   placeholder="e.g. https://antigravity.ai"
@@ -223,7 +225,7 @@ export default function PageCreationWizard() {
           {currentStep === 3 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Avatar Image URL</label>
+                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.avatarUrl')}</label>
                 <input
                   type="url"
                   placeholder="Paste profile image link..."
@@ -234,7 +236,7 @@ export default function PageCreationWizard() {
               </div>
 
               <div>
-                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Cover Photo URL</label>
+                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.coverUrl')}</label>
                 <input
                   type="url"
                   placeholder="Paste background banner link..."
@@ -250,7 +252,7 @@ export default function PageCreationWizard() {
           {currentStep === 4 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Physical Address</label>
+                <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.physicalAddress')}</label>
                 <input
                   type="text"
                   placeholder="e.g. 100 Main St, San Francisco, CA"
@@ -262,7 +264,7 @@ export default function PageCreationWizard() {
 
               <div style={{ display: 'flex', gap: '12px' }}>
                 <div style={{ flex: 1 }}>
-                  <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Latitude</label>
+                  <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.latitude')}</label>
                   <input
                     type="number"
                     step="0.000001"
@@ -273,7 +275,7 @@ export default function PageCreationWizard() {
                   />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Longitude</label>
+                  <label className="info-title" style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>{t('pages.longitude')}</label>
                   <input
                     type="number"
                     step="0.000001"
@@ -296,7 +298,7 @@ export default function PageCreationWizard() {
                 onClick={handleBack}
                 style={{ width: 'auto', padding: '10px 24px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-main)', border: '1px solid var(--panel-border)' }}
               >
-                Back
+                {t('pages.back')}
               </button>
             ) : (
               <div />
@@ -308,7 +310,7 @@ export default function PageCreationWizard() {
                 className="primary-btn"
                 style={{ width: 'auto', padding: '10px 24px', borderRadius: '10px' }}
               >
-                Next
+                {t('pages.next')}
               </button>
             ) : (
               <button
@@ -317,7 +319,7 @@ export default function PageCreationWizard() {
                 className="primary-btn"
                 style={{ width: 'auto', padding: '10px 24px', borderRadius: '10px' }}
               >
-                {submitting ? <i className="fa-solid fa-spinner fa-spin" /> : 'Create Page'}
+                {submitting ? <i className="fa-solid fa-spinner fa-spin" /> : t('pages.createPageBtn')}
               </button>
             )}
           </div>

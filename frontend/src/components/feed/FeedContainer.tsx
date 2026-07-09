@@ -8,6 +8,7 @@ import { PostCard } from '../post/PostCard';
 import { CreatePostBox } from '../post/CreatePostBox';
 import { StoryBar } from '../story/StoryBar';
 import { type Post } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 
 // A wrapper component that only renders its child when it enters the viewport root margin.
 // Acts as a lightweight virtualization wrapper for items of dynamic height in React 19.
@@ -53,6 +54,7 @@ const LazyRenderWrapper = ({ children, height = '350px' }: { children: React.Rea
 };
 
 export function FeedContainer() {
+  const { t } = useLanguage();
   const { token, socket, currentUser } = useChat();
   const queryClient = useQueryClient();
   const observerTargetRef = useRef<HTMLDivElement>(null);
@@ -166,7 +168,7 @@ export function FeedContainer() {
             className="new-posts-floating-btn"
           >
             <i className="fa-solid fa-arrow-up"></i>
-            <span>{pendingPosts.length} new post{pendingPosts.length > 1 ? 's' : ''} available. Click to load</span>
+            <span>{t('feed.newPostsAvailable').replace('{count}', String(pendingPosts.length))}</span>
           </button>
         </div>
       )}
@@ -187,9 +189,9 @@ export function FeedContainer() {
           color: 'var(--error)'
         }}>
           <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: '32px', marginBottom: '8px' }}></i>
-          <div>Failed to sync feed. Let's try reloading.</div>
+          <div>{t('feed.syncFailed')}</div>
           <button onClick={() => refetch()} className="primary-btn" style={{ width: 'auto', marginTop: '12px', padding: '6px 16px' }}>
-            Retry Sync
+            {t('feed.retrySync')}
           </button>
         </div>
       ) : posts.length === 0 ? (
@@ -202,8 +204,8 @@ export function FeedContainer() {
           color: 'var(--text-muted)'
         }}>
           <i className="fa-solid fa-earth-americas" style={{ fontSize: '36px', opacity: '0.4', marginBottom: '12px', display: 'block' }}></i>
-          <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Your Feed is Empty</div>
-          <div>Share a post or follow suggested friends on the right side panel to populate your feed!</div>
+          <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>{t('feed.feedEmpty')}</div>
+          <div>{t('feed.feedEmptyDesc')}</div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -218,13 +220,13 @@ export function FeedContainer() {
             {isFetchingNextPage && (
               <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
                 <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '6px' }}></i>
-                Synchronizing older posts...
+                {t('feed.syncOlder')}
               </div>
             )}
 
             {!hasNextPage && posts.length > 0 && (
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', opacity: 0.5 }}>
-                You have caught up with all updates!
+                {t('feed.caughtUp')}
               </div>
             )}
           </div>

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useChat } from '../hooks/useChat';
-import { PostCard } from './post/PostCard';
-import { fetchPostDetails, fetchPostComments, commentOnPost, type Post, type Comment } from '../services/api';
+import { useChat } from '../../hooks/useChat';
+import { PostCard } from './PostCard';
+import { fetchPostDetails, fetchPostComments, commentOnPost, type Post, type Comment } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 
 export function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { token, showToast } = useChat();
 
   const [post, setPost] = useState<Post | null>(null);
@@ -81,7 +83,7 @@ export function PostDetailPage() {
       <div className="profile-container" style={{ flexDirection: 'column', gap: '16px' }}>
         <div className="profile-spinner">
           <i className="fa-solid fa-spinner fa-spin"></i>
-          <div>Loading post details...</div>
+          <div>{t('post.loadingPostDetails')}</div>
         </div>
       </div>
     );
@@ -92,10 +94,10 @@ export function PostDetailPage() {
       <div className="profile-container">
         <div className="profile-error-card">
           <i className="fa-solid fa-triangle-exclamation"></i>
-          <h3>Post Not Found</h3>
-          <p>The post you are trying to view does not exist or has been deleted.</p>
+          <h3>{t('post.postNotFound')}</h3>
+          <p>{t('post.postNotFoundDesc')}</p>
           <button className="primary-btn" onClick={() => navigate('/')}>
-            Back to Dashboard
+            {t('post.backToDashboard')}
           </button>
         </div>
       </div>
@@ -135,7 +137,7 @@ export function PostDetailPage() {
           >
             <i className="fa-solid fa-arrow-left"></i>
           </button>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>Post Details</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>{t('post.postDetailsTitle')}</h2>
         </div>
 
         {/* Primary Post Card */}
@@ -144,16 +146,16 @@ export function PostDetailPage() {
         {/* Comment Thread List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '8px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 700, borderBottom: '1px solid var(--panel-border)', paddingBottom: '8px' }}>
-            Discussion ({comments.length})
+            {t('post.discussion').replace('{count}', String(comments.length))}
           </h3>
 
           {loadingComments ? (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
-              <i className="fa-solid fa-spinner fa-spin"></i> Syncing comments...
+              <i className="fa-solid fa-spinner fa-spin"></i> {t('post.syncingComments')}
             </div>
           ) : comments.length === 0 ? (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 0', fontSize: '13.5px' }}>
-              No comments on this post yet. Be the first to share your thoughts!
+              {t('post.beFirstComment')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -202,7 +204,7 @@ export function PostDetailPage() {
         <form onSubmit={handleCommentSubmit} style={{ display: 'flex', gap: '12px', borderTop: '1px solid var(--panel-border)', paddingTop: '16px', marginTop: '12px' }}>
           <input
             type="text"
-            placeholder="Write a comment..."
+            placeholder={t('post.commentPlaceholder')}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             disabled={submittingComment}
@@ -228,7 +230,7 @@ export function PostDetailPage() {
               borderRadius: '12px'
             }}
           >
-            {submittingComment ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Comment'}
+            {submittingComment ? <i className="fa-solid fa-spinner fa-spin"></i> : t('post.commentBtn')}
           </button>
         </form>
       </div>
