@@ -8,6 +8,7 @@ export interface User {
   avatar_url?: string | null;
   bio?: string | null;
   created_at?: string;
+  is_online?: boolean;
 }
 
 export interface Conversation {
@@ -27,6 +28,7 @@ export interface Conversation {
   last_message_sender_username?: string | null;
   last_message_created_at?: string | null;
   last_message_time?: string | null;
+  is_online?: boolean;
 }
 
 export interface Message {
@@ -155,6 +157,33 @@ export interface Story {
   createdAt: string;
   expiresAt?: string;
   isViewed?: boolean;
+}
+
+export interface Reel {
+  id: string;
+  user_id: string;
+  video_url: string;
+  caption: string | null;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+  updated_at: string;
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  has_liked: boolean;
+}
+
+export interface ReelComment {
+  id: string;
+  reel_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
 }
 
 /**
@@ -622,4 +651,81 @@ export async function createStory(_token: string, mediaUrl: string): Promise<Sto
     thumbnailUrl: res.data.media_url,
     createdAt: res.data.created_at
   };
+}
+
+/**
+ * Fetches Reels Feed.
+ */
+export async function fetchReelsFeed(_token: string, limit: number = 10, offset: number = 0): Promise<Reel[]> {
+  const res = await getData(`/reels?limit=${limit}&offset=${offset}`);
+  if (res.data && res.data.status === false) {
+    throw new Error(res.data.mess || 'Failed to load reels');
+  }
+  return res.data || [];
+}
+
+/**
+ * Creates a new short video Reel.
+ */
+export async function createReel(_token: string, videoUrl: string, caption: string | null): Promise<Reel> {
+  const res = await postData('/reels', { video_url: videoUrl, caption });
+  if (res.data && res.data.status === false) {
+    throw new Error(res.data.mess || 'Failed to post reel');
+  }
+  return res.data;
+}
+
+/**
+ * Likes or Unlikes a short video Reel.
+ */
+export async function likeReel(_token: string, reelId: string): Promise<{ liked: boolean; likes_count: number }> {
+  const res = await postData(`/reels/${reelId}/like`, {});
+  if (res.data && res.data.status === false) {
+    throw new Error(res.data.mess || 'Failed to like reel');
+  }
+  return res.data;
+}
+
+/**
+ * Comments on a short video Reel.
+ */
+export async function commentOnReel(_token: string, reelId: string, content: string): Promise<ReelComment> {
+  const res = await postData(`/reels/${reelId}/comments`, { content });
+  if (res.data && res.data.status === false) {
+    throw new Error(res.data.mess || 'Failed to post comment');
+  }
+  return res.data;
+}
+
+/**
+ * Gets comments for a short video Reel.
+ */
+export async function fetchReelComments(_token: string, reelId: string): Promise<ReelComment[]> {
+  const res = await getData(`/reels/${reelId}/comments`);
+  if (res.data && res.data.status === false) {
+    throw new Error(res.data.mess || 'Failed to load comments');
+  }
+  return res.data || [];
+}
+
+/**
+ * Fetches Reels posted by a specific user.
+ */
+export async function fetchUserReels(_token: string, userId: string): Promise<Reel[]> {
+  const res = await getData(`/users/${userId}/reels`);
+  if (res.data && res.data.status === false) {
+    throw new Error(res.data.mess || 'Failed to load user reels');
+  }
+  return res.data || [];
+}
+
+/**
+ * Deletes a short video Reel.
+ */
+export async function deleteReel(_token: string, reelId: string): Promise<{ message: string }> {
+  const res = await deleteData(`/reels/${reelId}`);
+  if (res.data && res.data.status === false) {
+    throw new Error(res.data.mess || 'Failed to delete reel');
+  }
+  return res.data;
 }

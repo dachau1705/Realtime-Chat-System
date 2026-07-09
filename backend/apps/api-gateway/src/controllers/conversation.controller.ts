@@ -15,8 +15,16 @@ export async function getConversations(req: AuthenticatedRequest, res: Response)
 }
 
 export async function createConversation(req: AuthenticatedRequest, res: Response) {
-  const { name, isGroup, memberIds } = req.body;
+  let { name, isGroup, memberIds } = req.body;
   const currentUserId = req.user!.userId;
+
+  if (typeof memberIds === 'string') {
+    try {
+      memberIds = JSON.parse(memberIds);
+    } catch (e) {
+      // Ignore
+    }
+  }
 
   if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
     return res.status(400).json({ error: 'memberIds array is required' });

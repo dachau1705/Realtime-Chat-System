@@ -14,7 +14,6 @@ export function ChatSidebar() {
     users,
     unreadBadges,
     currentRoomId,
-    socketConnected,
     selectConversation,
     startChatWithUser,
     createGroupChat,
@@ -209,7 +208,7 @@ export function ChatSidebar() {
                       displayName.charAt(0).toUpperCase()
                     )}
                   </div>
-                  {!c.is_group && socketConnected && <div className="presence-dot-online"></div>}
+                  {!c.is_group && c.is_online && <div className="presence-dot-online"></div>}
                 </div>
                 
                 <div className="chat-item-details">

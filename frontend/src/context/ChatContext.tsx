@@ -41,7 +41,7 @@ interface ChatContextType {
   notifications: Notification[];
   unreadNotifCount: number;
   toasts: Array<{ id: string; title: string; message: string; isError?: boolean }>;
-  activeTab: 'feed' | 'conversations' | 'users' | 'requests';
+  activeTab: 'feed' | 'conversations' | 'users' | 'requests' | 'reels';
   socketConnected: boolean;
   typingStatusText: string;
   pendingQueue: any[];
@@ -66,7 +66,7 @@ interface ChatContextType {
   markNotificationsRead: (id?: string) => Promise<void>;
   showToast: (title: string, message: string, isError?: boolean) => void;
   dismissToast: (id: string) => void;
-  setActiveTab: (tab: 'feed' | 'conversations' | 'users' | 'requests') => void;
+  setActiveTab: (tab: 'feed' | 'conversations' | 'users' | 'requests' | 'reels') => void;
   setToken: (token: string | null) => void;
   setCurrentUser: (user: User | null) => void;
   setOtherUser: (user: User | null) => void;
@@ -87,7 +87,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
   const [toasts, setToasts] = useState<Array<{ id: string; title: string; message: string; isError?: boolean }>>([]);
-  const [activeTab, setActiveTab] = useState<'feed' | 'conversations' | 'users' | 'requests'>('feed');
+  const [activeTab, setActiveTab] = useState<'feed' | 'conversations' | 'users' | 'requests' | 'reels'>('feed');
   const [socketConnected, setSocketConnected] = useState<boolean>(false);
   const [typingStatusText, setTypingStatusText] = useState<string>('');
   const [pendingQueue, setPendingQueue] = useState<any[]>([]);
@@ -258,6 +258,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const exists = prev.some(c => c.id === conv.id);
         if (exists) return prev;
         return [conv, ...prev];
+      });
+    });
+
+    socketInstance.on('user_presence', (data: { userId: string; status: 'online' | 'offline' }) => {
+      logEvent('incoming', 'USER_PRESENCE_CHANGED', data);
+      setUsers(prev => prev.map(u => 
+        u.id === data.userId ? { ...u, is_online: data.status === 'online' } : u
+      ));
+      setConversations(prev => prev.map(c => {
+        if (!c.is_group && c.member_ids.includes(data.userId)) {
+          return { ...c, is_online: data.status === 'online' };
+        }
+        return c;
+      }));
+      setOtherUser(prev => {
+        if (prev && prev.id === data.userId) {
+          return { ...prev, is_online: data.status === 'online' };
+        }
+        return prev;
       });
     });
 
@@ -432,12 +451,54 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   // Submitting direct message
-  const submitMessage = (content: string, type: 'text' | 'image' | 'sticker' = 'text', mediaUrl?: string) => {
+  const submitMessage = async (content: string, type: 'text' | 'image' | 'sticker' = 'text', mediaUrl?: string) => {
     if (!currentRoomId || !currentUser) return;
+
+    let roomId = currentRoomId;
+
+    if (roomId.startsWith('temp-')) {
+      const otherUserId = roomId.replace('temp-', '');
+      try {
+        const conversation = await apiCreateConversation(token!, otherUserId);
+        roomId = conversation.id;
+
+        const fullConversation: Conversation = {
+          id: conversation.id,
+          name: conversation.name,
+          is_group: conversation.is_group,
+          avatar_url: conversation.avatar_url,
+          member_usernames: [otherUser?.username || 'User'],
+          member_ids: [otherUserId],
+          member_avatar_urls: [],
+          member_full_names: [otherUser?.full_name || otherUser?.username || 'User'],
+          created_at: conversation.created_at,
+          last_message_content: null,
+          last_message: null,
+          last_message_type: null,
+          last_message_sender_id: null,
+          last_message_sender_username: null,
+          last_message_created_at: null,
+          last_message_time: null
+        };
+
+        setConversations(prev => {
+          const exists = prev.some(c => c.id === conversation.id);
+          if (exists) return prev;
+          return [fullConversation, ...prev];
+        });
+
+        setCurrentRoomId(conversation.id);
+        loadConversations();
+      } catch (err: any) {
+        console.error('Failed to auto-create conversation on first message:', err);
+        showToast('Error', `Failed to send message: ${err.message || 'unable to establish room'}`, true);
+        return;
+      }
+    }
 
     const clientMessageId = crypto.randomUUID();
     const msgPayload = {
-      conversationId: currentRoomId,
+      conversationId: roomId,
       clientMessageId: clientMessageId,
       content: content,
       type,
@@ -451,7 +512,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     const localMsg: Message = {
       id: clientMessageId,
-      conversation_id: currentRoomId,
+      conversation_id: roomId,
       sender_id: currentUser.id,
       content: content,
       created_at: new Date().toISOString(),
@@ -617,6 +678,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     });
 
     setMessages([]);
+
+    if (roomId.startsWith('temp-')) {
+      return;
+    }
+
     logEvent('info', 'HISTORY_SYNC_INIT', { roomId });
 
     try {
@@ -634,11 +700,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (!token) return;
     logEvent('info', 'START_CHAT_INIT', { otherUserId, otherUsername });
     try {
-      const conversation = await apiCreateConversation(token, otherUserId);
-      setCurrentRoomId(conversation.id);
-      setOtherUser({ id: otherUserId, username: otherUsername, email: '' });
+      // 1. Check if we already have a 1-to-1 conversation with this user in the local list
+      const existingConv = conversations.find(c => !c.is_group && c.member_ids.includes(otherUserId));
+      
+      if (existingConv) {
+        setActiveTab('conversations');
+        await selectConversation(existingConv.id, otherUsername, otherUserId);
+        return;
+      }
+
+      // 2. If not found in the local list, open a temporary chat room (won't touch database until first message is sent)
+      const tempRoomId = `temp-${otherUserId}`;
       setActiveTab('conversations');
-      await loadConversations();
+      await selectConversation(tempRoomId, otherUsername, otherUserId);
     } catch (err: any) {
       logEvent('info', 'START_CHAT_FAILED', err.message);
     }

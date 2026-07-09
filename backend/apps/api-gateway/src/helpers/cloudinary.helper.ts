@@ -10,7 +10,8 @@ cloudinary.config({
 export function uploadToCloudinary(
   fileBuffer: Buffer,
   publicId: string,
-  folder: string = 'chat'
+  folder: string = 'chat',
+  resourceType: 'image' | 'video' | 'raw' | 'auto' = 'image'
 ): Promise<any> {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
@@ -18,7 +19,8 @@ export function uploadToCloudinary(
         public_id: publicId,
         folder: folder,
         overwrite: true,
-        invalidate: true
+        invalidate: true,
+        resource_type: resourceType
       },
       (error, result) => {
         if (error) {

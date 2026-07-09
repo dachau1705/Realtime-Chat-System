@@ -92,6 +92,10 @@ export async function bootstrapGateway() {
           const { receiverId, senderUsername } = event.data;
           io.to(`user:${receiverId}`).emit('friend_accepted', { senderUsername });
           logger.info(`Forwarded friend_accept event to user:${receiverId} for sender ${senderUsername}`);
+        } else if (event.type === 'presence_change') {
+          const { userId, status } = event.data;
+          io.emit('user_presence', { userId, status });
+          logger.info(`Broadcasted presence_change for user ${userId}: ${status}`);
         } else if (event.type === 'profile_update') {
           const { userId, username, fullName, avatarUrl } = event.data;
           io.emit('profile_updated', { userId, username, fullName, avatarUrl });
@@ -220,6 +224,10 @@ export async function bootstrapGateway() {
     // Set online presence in Redis & start heartbeat
     try {
       await redisService.setUserOnline(userId, socket.id, NODE_NAME);
+      await redisService.publish(REDIS_EVENT_CHANNEL, {
+        type: 'presence_change',
+        data: { userId, status: 'online' }
+      });
     } catch (err) {
       logger.warn('Failed to set online presence in Redis on connect', { userId, error: (err as Error).message });
     }
@@ -540,6 +548,10 @@ export async function bootstrapGateway() {
       
       try {
         await redisService.setUserOffline(userId);
+        await redisService.publish(REDIS_EVENT_CHANNEL, {
+          type: 'presence_change',
+          data: { userId, status: 'offline' }
+        });
       } catch (err) {
         logger.error('Failed to set user offline in Redis', { userId, error: (err as Error).message });
       }

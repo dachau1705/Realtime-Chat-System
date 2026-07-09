@@ -121,9 +121,13 @@ export function ChatArea() {
         ? (activeConv.member_full_names?.[0] || activeConv.member_usernames?.[0] || 'Conversation')
         : 'Conversation';
 
+  const isOnline = activeConv?.is_group ? false : (activeConv?.is_online || otherUser?.is_online);
+
   const displayStatus = activeConv?.is_group
     ? `Group Chat • ${activeConv.member_ids.length + 1} members`
-    : 'Direct Chat Session';
+    : isOnline
+      ? 'Online'
+      : 'Offline';
 
   return (
     <div className="chat-viewport-wrapper">

@@ -171,6 +171,15 @@ export function Sidebar() {
             </span>
           )}
         </button>
+        <button
+          className={`tab-btn ${activeTab === 'reels' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('reels');
+            navigate('/reels');
+          }}
+        >
+          <i className="fa-solid fa-clapperboard"></i> {t('sidebar.reels')}
+        </button>
       </div>
 
       {activeTab === 'conversations' ? (

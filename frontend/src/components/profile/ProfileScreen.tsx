@@ -10,9 +10,11 @@ import {
   uploadCover, 
   fetchUserFriends, 
   fetchUserPosts,
+  fetchUserReels,
   type UserProfile,
   type UserFriend,
-  type Post
+  type Post,
+  type Reel
 } from '../../services/api';
 
 export function ProfileScreen() {
@@ -36,11 +38,13 @@ export function ProfileScreen() {
   const [friendsLoading, setFriendsLoading] = useState<boolean>(false);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState<boolean>(false);
+  const [userReels, setUserReels] = useState<Reel[]>([]);
+  const [reelsLoading, setReelsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   
-  // Tabs: 'about' | 'friends' | 'activity'
-  const [activeTab, setActiveTab] = useState<'about' | 'friends' | 'activity'>('about');
+  // Tabs: 'about' | 'friends' | 'activity' | 'reels'
+  const [activeTab, setActiveTab] = useState<'about' | 'friends' | 'activity' | 'reels'>('about');
   
   // Edit Profile Modal State
   const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
@@ -114,6 +118,19 @@ export function ProfileScreen() {
     }
   };
 
+  const loadUserReelsList = async () => {
+    if (!token || !id || profile?.is_redacted) return;
+    try {
+      setReelsLoading(true);
+      const data = await fetchUserReels(token, id);
+      setUserReels(data);
+    } catch (err: any) {
+      console.error('Failed to load user reels', err);
+    } finally {
+      setReelsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadProfile();
     setActiveTab('about');
@@ -128,6 +145,12 @@ export function ProfileScreen() {
   useEffect(() => {
     if (profile && !profile.is_redacted && activeTab === 'activity') {
       loadUserPostsList();
+    }
+  }, [profile, activeTab]);
+
+  useEffect(() => {
+    if (profile && !profile.is_redacted && activeTab === 'reels') {
+      loadUserReelsList();
     }
   }, [profile, activeTab]);
 
@@ -432,6 +455,12 @@ export function ProfileScreen() {
           >
             {t('profile.activity')}
           </button>
+          <button 
+            className={`profile-tab-link ${activeTab === 'reels' ? 'active' : ''}`}
+            onClick={() => setActiveTab('reels')}
+          >
+            {t('reels.reelsTitle')}
+          </button>
         </div>
 
         {/* 4. Tab Display Panel */}
@@ -551,6 +580,64 @@ export function ProfileScreen() {
                 <div style={{ maxWidth: '620px', margin: '0 auto', width: '100%' }}>
                   {userPosts.map((post) => (
                     <PostCard key={post.id} post={post} onPostDeleted={loadUserPostsList} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'reels' && (
+            <div className="tab-activity-content">
+              {reelsLoading ? (
+                <div className="tab-panel-loader">
+                  <i className="fa-solid fa-spinner fa-spin"></i> {t('story.loadingStories') || 'Loading reels...'}
+                </div>
+              ) : userReels.length === 0 ? (
+                <div className="tab-panel-empty" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
+                  <i className="fa-solid fa-clapperboard" style={{ fontSize: '32px', marginBottom: '12px', display: 'block', opacity: 0.5 }}></i>
+                  {t('reels.noUserReels')}
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                  gap: '12px',
+                  width: '100%'
+                }}>
+                  {userReels.map((reel) => (
+                    <div
+                      key={reel.id}
+                      onClick={() => navigate(`/reels`)}
+                      style={{
+                        position: 'relative',
+                        aspectRatio: '9/16',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        background: '#000',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                      }}
+                    >
+                      <video
+                        src={reel.video_url}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '8px',
+                        left: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        color: 'white',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        textShadow: '0 1px 2px rgba(0,0,0,0.8)'
+                      }}>
+                        <i className="fa-regular fa-heart"></i>
+                        <span>{reel.likes_count}</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

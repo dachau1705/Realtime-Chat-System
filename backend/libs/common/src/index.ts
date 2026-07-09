@@ -95,3 +95,5 @@ export interface ReceiptEvent {
   user_id: string;
   status: 'delivered' | 'seen';
 }
+
+export * from './modelBase';

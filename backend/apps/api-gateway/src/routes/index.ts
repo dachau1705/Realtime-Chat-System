@@ -8,6 +8,7 @@ import postRouter from './post.routes';
 import storyRouter from './story.routes';
 import notificationRouter from './notification.routes';
 import pagesRouter from './pages.routes';
+import reelsRouter from './reels.routes';
 
 const router = express.Router();
 
@@ -20,5 +21,6 @@ router.use(postRouter);
 router.use(storyRouter);
 router.use(notificationRouter);
 router.use(pagesRouter);
+router.use(reelsRouter);
 
 export default router;

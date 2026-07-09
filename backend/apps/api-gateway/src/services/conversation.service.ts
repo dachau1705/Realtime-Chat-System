@@ -3,7 +3,33 @@ import { redisService } from '../config/services';
 import { logger } from '@libs/common';
 
 export async function getConversations(userId: string) {
-  return await conversationRepo.getUserConversations(userId);
+  const conversations = await conversationRepo.getUserConversations(userId);
+
+  const enrichedConversations = await Promise.all(
+    conversations.map(async (c: any) => {
+      if (c.is_group) {
+        return { ...c, is_online: false };
+      }
+      
+      const otherUserId = c.member_ids?.[0];
+      if (!otherUserId) {
+        return { ...c, is_online: false };
+      }
+
+      try {
+        const presence = await redisService.getUserPresence(otherUserId);
+        return {
+          ...c,
+          is_online: presence?.status === 'online'
+        };
+      } catch (err) {
+        logger.warn('Failed to fetch user presence from Redis', { userId: otherUserId, error: (err as Error).message });
+        return { ...c, is_online: false };
+      }
+    })
+  );
+
+  return enrichedConversations;
 }
 
 export async function createConversation(

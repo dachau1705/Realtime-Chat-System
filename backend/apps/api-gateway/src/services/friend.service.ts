@@ -1,5 +1,6 @@
 import * as friendRepo from '../repositories/friend.repository';
 import * as userRepo from '../repositories/user.repository';
+import * as conversationService from './conversation.service';
 import { createNotification } from '../helpers/notification.helper';
 import { redisService } from '../config/services';
 import { logger } from '@libs/common';
@@ -27,6 +28,13 @@ export async function manageFriendRequest(currentUserId: string, currentUsername
     } else {
       // Accept request
       await friendRepo.acceptFriendshipRequest(friendship.user_id_1, friendship.user_id_2);
+
+      // Auto-create 1-to-1 conversation if it doesn't exist
+      try {
+        await conversationService.createConversation(null, false, [friendship.user_id_1, friendship.user_id_2], friendship.user_id_1);
+      } catch (convErr: any) {
+        logger.error('Failed to auto-create conversation on friend request acceptance in manageFriendRequest', { error: convErr.message });
+      }
 
       // Notify target user
       try {
@@ -84,6 +92,13 @@ export async function acceptFriendRequest(currentUserId: string, currentUsername
     throw new Error('Pending friend request not found');
   }
 
+  // Auto-create 1-to-1 conversation if it doesn't exist
+  try {
+    await conversationService.createConversation(null, false, [senderId, currentUserId], currentUserId);
+  } catch (convErr: any) {
+    logger.error('Failed to auto-create conversation on friend request acceptance in acceptFriendRequest', { error: convErr.message });
+  }
+
   // Notify original sender that their request was accepted!
   try {
     await redisService.publish('chat:events', {
@@ -124,7 +139,23 @@ export async function getFriendsList(targetUserId: string, currentUserId: string
     throw new Error("This user's friend list is private");
   }
 
-  return await friendRepo.getFriendsList(targetUserId, currentUserId);
+  const friends = await friendRepo.getFriendsList(targetUserId, currentUserId);
+  const enrichedFriends = await Promise.all(
+    friends.map(async (f: any) => {
+      try {
+        const presence = await redisService.getUserPresence(f.id);
+        return {
+          ...f,
+          is_online: presence?.status === 'online'
+        };
+      } catch (err) {
+        logger.warn('Failed to fetch user presence from Redis', { userId: f.id, error: (err as Error).message });
+        return { ...f, is_online: false };
+      }
+    })
+  );
+
+  return enrichedFriends;
 }
 
 export async function getSuggestions(currentUserId: string) {

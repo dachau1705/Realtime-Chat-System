@@ -295,5 +295,38 @@ CREATE TABLE IF NOT EXISTS page_post_comments (
 );
 CREATE INDEX IF NOT EXISTS idx_page_post_comments_query ON page_post_comments(post_id, created_at ASC);
 
+-- 21. Reels table
+CREATE TABLE IF NOT EXISTS reels (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    video_url VARCHAR(1024) NOT NULL,
+    caption TEXT NULL,
+    likes_count INT DEFAULT 0 NOT NULL,
+    comments_count INT DEFAULT 0 NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_reels_user ON reels(user_id, created_at DESC);
+
+-- 22. Reel Likes table
+CREATE TABLE IF NOT EXISTS reel_likes (
+    reel_id UUID REFERENCES reels(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (reel_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_reel_likes_reel ON reel_likes(reel_id);
+
+-- 23. Reel Comments table
+CREATE TABLE IF NOT EXISTS reel_comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reel_id UUID REFERENCES reels(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_reel_comments_reel ON reel_comments(reel_id, created_at ASC);
+
 
 

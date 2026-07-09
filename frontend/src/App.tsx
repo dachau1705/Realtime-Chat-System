@@ -12,6 +12,7 @@ import { Header } from './components/layout/Header';
 import PageCreationWizard from './components/pages/PageCreationWizard';
 import { PageDetail } from './components/pages/PageDetail';
 import { FriendsMainPage } from './components/friends/FriendsMainPage';
+import { ReelsFeed } from './components/reels/ReelsFeed';
 
 export default function App() {
   const { token, setToken, setCurrentUser, connectSocket, toasts, dismissToast, activeTab, setActiveTab } = useChat();
@@ -47,6 +48,10 @@ export default function App() {
         if (activeTab !== targetTab) {
           setActiveTab(targetTab);
         }
+      } else if (location.pathname === '/reels') {
+        if (activeTab !== 'reels') {
+          setActiveTab('reels');
+        }
       }
     }
   }, [location.pathname, activeTab, setActiveTab, token]);
@@ -80,6 +85,12 @@ export default function App() {
                 <Route path="/posts/:id" element={<PostDetailPage />} />
                 <Route path="/pages/create" element={<PageCreationWizard />} />
                 <Route path="/pages/:id" element={<PageDetail />} />
+                <Route path="/reels" element={
+                  <div className="container">
+                    <Sidebar />
+                    <ReelsFeed />
+                  </div>
+                } />
               </Routes>
             </div>
           </div>

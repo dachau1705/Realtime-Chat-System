@@ -64,7 +64,8 @@ export const translations = {
       feed: "Bảng tin",
       chats: "Đoạn chat",
       friends: "Bạn bè",
-      requests: "Lời mời"
+      requests: "Lời mời",
+      reels: "Video ngắn"
     },
     chat: {
       searchPlaceholder: "Tìm kiếm cuộc trò chuyện...",
@@ -310,6 +311,30 @@ export const translations = {
       privacyPolicy: "Chính sách bảo mật",
       termsOfService: "Điều khoản dịch vụ",
       copyright: "© {year} Antigravity Systems. Bảo lưu mọi quyền. Được phát triển bằng TypeScript & React."
+    },
+    reels: {
+      reelsTitle: "Video ngắn",
+      createReel: "Tạo Reels",
+      addReel: "Thêm thước phim mới",
+      videoUrl: "Video URL",
+      captionPlaceholder: "Hãy viết chú thích cho Reels của bạn...",
+      postReelBtn: "Đăng thước phim",
+      noReels: "Không có thước phim nào khả dụng. Hãy đăng thước phim đầu tiên!",
+      noUserReels: "Người dùng này chưa đăng thước phim nào.",
+      uploading: "Đang tải lên thước phim...",
+      publishSuccess: "Đã đăng Reels thành công!",
+      publishError: "Đăng Reels thất bại",
+      deleteConfirm: "Bạn có chắc chắn muốn xóa thước phim này?",
+      deleteSuccess: "Đã xóa thước phim thành công",
+      commentsTitle: "Bình luận",
+      writeComment: "Viết bình luận...",
+      commentBtn: "Bình luận",
+      copyLinkBtn: "Sao chép liên kết",
+      linkCopied: "Đã sao chép liên kết vào bộ nhớ tạm!",
+      mute: "Tắt tiếng",
+      unmute: "Bật tiếng",
+      backToDashboard: "Quay lại Bảng tin",
+      cancel: "Hủy bỏ"
     }
   },
   en: {
@@ -377,7 +402,8 @@ export const translations = {
       feed: "Feed",
       chats: "Chats",
       friends: "Friends",
-      requests: "Requests"
+      requests: "Requests",
+      reels: "Reels"
     },
     chat: {
       searchPlaceholder: "Search conversation...",
@@ -623,6 +649,30 @@ export const translations = {
       privacyPolicy: "Privacy Policy",
       termsOfService: "Terms of Service",
       copyright: "© {year} Antigravity Systems. All rights reserved. Built with TypeScript & React."
+    },
+    reels: {
+      reelsTitle: "Reels",
+      createReel: "Create Reel",
+      addReel: "Add a new reel",
+      videoUrl: "Video URL",
+      captionPlaceholder: "Write a caption for your Reel...",
+      postReelBtn: "Post Reel",
+      noReels: "No Reels available. Be the first to share one!",
+      noUserReels: "This user hasn't posted any Reels yet.",
+      uploading: "Uploading short video...",
+      publishSuccess: "Reel published successfully!",
+      publishError: "Failed to publish Reel",
+      deleteConfirm: "Are you sure you want to delete this Reel?",
+      deleteSuccess: "Reel deleted successfully",
+      commentsTitle: "Comments",
+      writeComment: "Write a comment...",
+      commentBtn: "Comment",
+      copyLinkBtn: "Copy Link",
+      linkCopied: "Link copied to clipboard!",
+      mute: "Mute",
+      unmute: "Unmute",
+      backToDashboard: "Back to Dashboard",
+      cancel: "Cancel"
     }
   }
 };
