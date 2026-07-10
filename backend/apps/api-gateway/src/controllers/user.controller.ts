@@ -39,11 +39,26 @@ export async function update(req: AuthenticatedRequest, res: Response) {
     return res.status(403).json({ error: 'You are not authorized to edit this profile' });
   }
 
-  const { full_name, phone, bio, privacy_is_public } = req.body;
+  const { full_name, phone, bio, privacy_is_public, about_info } = req.body;
+  console.log("[DEBUG BACKEND] Received PUT /users/:id. Target User ID:", targetUserId, "Current User ID:", currentUserId);
+  console.log("[DEBUG BACKEND] Request body:", { full_name, phone, bio, privacy_is_public, about_info });
+
+  let parsedAboutInfo = about_info;
+  if (about_info && typeof about_info === 'string') {
+    try {
+      parsedAboutInfo = JSON.parse(about_info);
+      console.log("[DEBUG BACKEND] Successfully parsed about_info string to object:", parsedAboutInfo);
+    } catch (err) {
+      console.error("[DEBUG BACKEND] Failed to parse about_info JSON string:", err);
+    }
+  }
+
   try {
-    const user = await userService.updateProfile(targetUserId, full_name, phone, bio, privacy_is_public);
+    const user = await userService.updateProfile(targetUserId, full_name, phone, bio, privacy_is_public, parsedAboutInfo);
+    console.log("[DEBUG BACKEND] Successfully updated profile. Returning user.");
     res.json(user);
   } catch (err) {
+    console.error('Failed to update user profile error details:', err);
     logger.error('Failed to update user profile', { error: (err as Error).message });
     res.status(500).json({ error: (err as Error).message });
   }
@@ -127,4 +142,42 @@ export async function getFollowStatus(req: AuthenticatedRequest, res: Response) 
     res.status(500).json({ error: (err as Error).message });
   }
 }
+
+export async function searchLocations(req: AuthenticatedRequest, res: Response) {
+  const q = req.query.q || '';
+  try {
+    const result = await userService.searchLocations(String(q));
+    res.json(result);
+  } catch (err) {
+    logger.error('Failed to search locations', { error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
+  }
+}
+
+export async function searchLanguages(req: AuthenticatedRequest, res: Response) {
+  const q = req.query.q || '';
+  try {
+    const result = await userService.searchLanguages(String(q));
+    res.json(result);
+  } catch (err) {
+    logger.error('Failed to search languages', { error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
+  }
+}
+
+export async function acceptFamilyRequest(req: AuthenticatedRequest, res: Response) {
+  const currentUserId = req.user!.userId;
+  const requestId = req.params.id;
+  try {
+    const result = await userService.acceptFamilyRequest(currentUserId, requestId);
+    if (!result) {
+      return res.status(404).json({ error: 'Request not found or unauthorized' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('Failed to accept family request', { error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
+  }
+}
+
 

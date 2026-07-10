@@ -3,9 +3,26 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import * as postService from '../services/post.service';
 import { logger } from '@libs/common';
 
+function parseArray(val: any): string[] {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Ignore
+    }
+  }
+  return [];
+}
+
 export async function create(req: AuthenticatedRequest, res: Response) {
-  const { content, media_urls = [], visibility = 'public', allowed_user_ids = [], blocked_user_ids = [] } = req.body;
+  let { content, media_urls, visibility = 'public', allowed_user_ids, blocked_user_ids } = req.body;
   const userId = req.user!.userId;
+
+  media_urls = parseArray(media_urls);
+  allowed_user_ids = parseArray(allowed_user_ids);
+  blocked_user_ids = parseArray(blocked_user_ids);
 
   if (!content && (!media_urls || media_urls.length === 0)) {
     return res.status(400).json({ error: 'Post must contain text content or media' });
@@ -50,7 +67,11 @@ export async function getPost(req: AuthenticatedRequest, res: Response) {
 export async function update(req: AuthenticatedRequest, res: Response) {
   const currentUserId = req.user!.userId;
   const postId = req.params.id;
-  const { content, media_urls, visibility, allowed_user_ids, blocked_user_ids } = req.body;
+  let { content, media_urls, visibility, allowed_user_ids, blocked_user_ids } = req.body;
+
+  if (media_urls !== undefined) media_urls = parseArray(media_urls);
+  if (allowed_user_ids !== undefined) allowed_user_ids = parseArray(allowed_user_ids);
+  if (blocked_user_ids !== undefined) blocked_user_ids = parseArray(blocked_user_ids);
 
   try {
     const post = await postService.update(postId, currentUserId, content, media_urls, visibility, allowed_user_ids, blocked_user_ids);

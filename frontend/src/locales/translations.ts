@@ -7,6 +7,11 @@ export const translations = {
       notificationsTooltip: "Thông báo",
       switchTheme: "Chuyển đổi giao diện"
     },
+    common: {
+      success: "Thành công",
+      error: "Lỗi",
+      validationError: "Lỗi kiểm tra"
+    },
     accountMenu: {
       viewProfile: "Xem trang cá nhân",
       managedPages: "Trang bạn quản lý",
@@ -265,10 +270,17 @@ export const translations = {
       about: "Giới thiệu",
       friends: "Bạn bè",
       activity: "Hoạt động",
+      all: "Tất cả",
+      photos: "Ảnh",
+      more: "Xem thêm",
       fullName: "Họ và tên",
       emailAddress: "Địa chỉ email",
       phoneNumber: "Số điện thoại",
       joinedDate: "Ngày tham gia",
+      introTitle: "Giới thiệu",
+      highlightsTitle: "Tin nổi bật",
+      postsTitle: "Bài viết",
+      viewAll: "Xem tất cả",
       privacyLevel: "Quyền riêng tư",
       notProvided: "Chưa cung cấp",
       privateHidden: "Riêng tư / Ẩn",
@@ -344,6 +356,11 @@ export const translations = {
       chatsTooltip: "Chats",
       notificationsTooltip: "Notifications",
       switchTheme: "Switch Theme"
+    },
+    common: {
+      success: "Success",
+      error: "Error",
+      validationError: "Validation Error"
     },
     accountMenu: {
       viewProfile: "View profile",
@@ -603,10 +620,17 @@ export const translations = {
       about: "About",
       friends: "Friends",
       activity: "Activity",
+      all: "All",
+      photos: "Photos",
+      more: "More",
       fullName: "Full Name",
       emailAddress: "Email Address",
       phoneNumber: "Phone Number",
       joinedDate: "Joined Date",
+      introTitle: "Intro",
+      highlightsTitle: "Highlights",
+      postsTitle: "Posts",
+      viewAll: "See All",
       privacyLevel: "Privacy Level",
       notProvided: "Not provided",
       privateHidden: "Private / Hidden",

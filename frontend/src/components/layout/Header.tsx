@@ -522,6 +522,10 @@ export function Header() {
                       text = 'sent you a friend request.';
                     } else if (notif.type === 'friend_accept') {
                       text = 'accepted your friend request.';
+                    } else if (notif.type === 'family_request') {
+                      text = 'gửi yêu cầu xác nhận thành viên gia đình.';
+                    } else if (notif.type === 'family_accept') {
+                      text = 'đã xác nhận là thành viên gia đình của bạn.';
                     }
 
                     return (

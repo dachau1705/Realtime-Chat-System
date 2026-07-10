@@ -37,7 +37,7 @@ export const PostCard = React.memo(({ post, onPostDeleted }: PostCardProps) => {
     if (confirm(t('post.deleteConfirm'))) {
       deleteMutation.mutate(post.id, {
         onSuccess: () => {
-          showToast(t('friends.addFriend') || 'Success', t('post.deleteSuccess'), false);
+          showToast(t('common.success') || 'Success', t('post.deleteSuccess'), false);
           onPostDeleted?.();
         },
         onError: (err: any) => {

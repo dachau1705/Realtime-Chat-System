@@ -2,13 +2,18 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChat } from '../../hooks/useChat';
 import { PostCard } from '../post/PostCard';
+import { CreatePostBox } from '../post/CreatePostBox';
 import { useLanguage } from '../../context/LanguageContext';
-import { 
-  fetchUserProfile, 
-  updateUserProfile, 
-  uploadAvatar, 
-  uploadCover, 
-  fetchUserFriends, 
+import { PhotosGrid } from './PhotosGrid';
+import { FriendsGrid } from './FriendsGrid';
+import { ReelsGrid } from './ReelsGrid';
+import { AboutTabCard } from './AboutTabCard';
+import {
+  fetchUserProfile,
+  updateUserProfile,
+  uploadAvatar,
+  uploadCover,
+  fetchUserFriends,
   fetchUserPosts,
   fetchUserReels,
   type UserProfile,
@@ -21,12 +26,12 @@ export function ProfileScreen() {
   const { t } = useLanguage();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { 
-    token, 
-    showToast, 
-    addFriend, 
-    acceptRequest, 
-    declineRequest, 
+  const {
+    token,
+    showToast,
+    addFriend,
+    acceptRequest,
+    declineRequest,
     startChatWithUser,
     currentUser,
     setCurrentUser
@@ -42,10 +47,27 @@ export function ProfileScreen() {
   const [reelsLoading, setReelsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
-  
-  // Tabs: 'about' | 'friends' | 'activity' | 'reels'
-  const [activeTab, setActiveTab] = useState<'about' | 'friends' | 'activity' | 'reels'>('about');
-  
+
+  // Tabs: 'all' | 'about' | 'reels' | 'photos' | 'friends'
+  const [activeTab, setActiveTab] = useState<'all' | 'about' | 'reels' | 'photos' | 'friends'>('all');
+  const [showMoreMenu, setShowMoreMenu] = useState<boolean>(false);
+
+  const renderBirthdayDisplay = (val: string | null | undefined) => {
+    if (!val) return '12 tháng 10';
+    try {
+      if (val.trim().startsWith('{')) {
+        const bd = JSON.parse(val);
+        if (bd.hide_year) {
+          return `Ngày ${bd.day} tháng ${bd.month}`;
+        }
+        return `Ngày ${bd.day} tháng ${bd.month}, năm ${bd.year}`;
+      }
+    } catch (err) {
+      // Ignore
+    }
+    return val;
+  };
+
   // Edit Profile Modal State
   const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
   const [formData, setFormData] = useState({
@@ -65,7 +87,7 @@ export function ProfileScreen() {
       setError(null);
       const data = await fetchUserProfile(token, id);
       setProfile(data);
-      
+
       // Update global currentUser context and session storage if viewing self
       if (currentUser && data.id === currentUser.id) {
         const updatedUser = {
@@ -77,7 +99,7 @@ export function ProfileScreen() {
         setCurrentUser(updatedUser);
         sessionStorage.setItem('chatUser', JSON.stringify(updatedUser));
       }
-      
+
       // Initialize edit form
       setFormData({
         full_name: data.full_name || '',
@@ -133,23 +155,23 @@ export function ProfileScreen() {
 
   useEffect(() => {
     loadProfile();
-    setActiveTab('about');
+    setActiveTab('all');
   }, [id, token]);
 
   useEffect(() => {
-    if (profile && !profile.is_redacted && activeTab === 'friends') {
+    if (profile && !profile.is_redacted && (activeTab === 'friends' || activeTab === 'all' || activeTab === 'about')) {
       loadFriends();
     }
   }, [profile, activeTab]);
 
   useEffect(() => {
-    if (profile && !profile.is_redacted && activeTab === 'activity') {
+    if (profile && !profile.is_redacted && (activeTab === 'all' || activeTab === 'photos' || activeTab === 'about')) {
       loadUserPostsList();
     }
   }, [profile, activeTab]);
 
   useEffect(() => {
-    if (profile && !profile.is_redacted && activeTab === 'reels') {
+    if (profile && !profile.is_redacted && (activeTab === 'reels' || activeTab === 'all' || activeTab === 'about')) {
       loadUserReelsList();
     }
   }, [profile, activeTab]);
@@ -158,7 +180,7 @@ export function ProfileScreen() {
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !token) return;
-    
+
     // Preview locally first
     const reader = new FileReader();
     reader.onload = () => {
@@ -171,7 +193,7 @@ export function ProfileScreen() {
     try {
       setActionLoading(true);
       await uploadAvatar(token, file);
-      showToast(t('friends.addFriend') || 'Success', t('profile.avatarSuccess'), false);
+      showToast(t('common.success') || 'Success', t('profile.avatarSuccess'), false);
       // Reload profile to lock in backend public URL
       await loadProfile();
     } catch (err: any) {
@@ -198,7 +220,7 @@ export function ProfileScreen() {
     try {
       setActionLoading(true);
       await uploadCover(token, file);
-      showToast(t('friends.addFriend') || 'Success', t('profile.coverSuccess'), false);
+      showToast(t('common.success') || 'Success', t('profile.coverSuccess'), false);
       await loadProfile();
     } catch (err: any) {
       showToast(t('friends.delete') || 'Error', err.message || 'Failed to upload cover banner', true);
@@ -220,10 +242,33 @@ export function ProfileScreen() {
         privacy_is_public: formData.privacy_is_public
       });
       setProfile(updated);
-      showToast(t('friends.addFriend') || 'Success', t('profile.profileSuccess'), false);
+      showToast(t('common.success') || 'Success', t('profile.profileSuccess'), false);
       setEditModalOpen(false);
     } catch (err: any) {
       showToast(t('friends.delete') || 'Error', err.message || 'Failed to update profile', true);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpdateAboutInfo = async (aboutData: any) => {
+    if (!token || !profile) return;
+    console.log("[DEBUG FRONTEND] handleUpdateAboutInfo triggered. aboutData:", aboutData);
+    try {
+      setActionLoading(true);
+      const updated = await updateUserProfile(token, profile.id, {
+        full_name: profile.full_name,
+        phone: profile.phone,
+        bio: profile.bio,
+        privacy_is_public: profile.privacy_is_public,
+        about_info: aboutData
+      });
+      console.log("[DEBUG FRONTEND] handleUpdateAboutInfo API success. Returned updated profile:", updated);
+      setProfile(updated);
+    } catch (err: any) {
+      console.error("[DEBUG FRONTEND] handleUpdateAboutInfo API error:", err);
+      showToast(t('friends.delete') || 'Error', err.message || 'Failed to update about details', true);
+      throw err;
     } finally {
       setActionLoading(false);
     }
@@ -314,28 +359,37 @@ export function ProfileScreen() {
   const mutualFriendsCount = friends.filter(f => f.is_mutual).length;
   const formattedDate = profile.created_at
     ? new Date(profile.created_at).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
     : 'Unknown';
+
+  const allPhotos = userPosts.flatMap(post => post.media_urls || []);
+
+  const handlePhotoClick = (url: string) => {
+    const post = userPosts.find(p => p.media_urls?.includes(url));
+    if (post) {
+      navigate(`/posts/${post.id}`);
+    }
+  };
 
   return (
     <div className="profile-container">
       {/* Hidden file upload inputs */}
-      <input 
-        type="file" 
-        ref={avatarInputRef} 
-        onChange={handleAvatarChange} 
-        accept="image/*" 
-        style={{ display: 'none' }} 
+      <input
+        type="file"
+        ref={avatarInputRef}
+        onChange={handleAvatarChange}
+        accept="image/*"
+        style={{ display: 'none' }}
       />
-      <input 
-        type="file" 
-        ref={coverInputRef} 
-        onChange={handleCoverChange} 
-        accept="image/*" 
-        style={{ display: 'none' }} 
+      <input
+        type="file"
+        ref={coverInputRef}
+        onChange={handleCoverChange}
+        accept="image/*"
+        style={{ display: 'none' }}
       />
 
       <div className="profile-card advanced-layout">
@@ -349,10 +403,10 @@ export function ProfileScreen() {
           <button className="profile-back-btn" onClick={() => navigate('/')} title="Back to Dashboard">
             <i className="fa-solid fa-arrow-left"></i>
           </button>
-          
+
           {isOwner && (
-            <button 
-              className="profile-cover-upload-btn" 
+            <button
+              className="profile-cover-upload-btn"
               onClick={() => coverInputRef.current?.click()}
               title="Change cover photo"
             >
@@ -371,10 +425,10 @@ export function ProfileScreen() {
                 {profile.username.charAt(0).toUpperCase()}
               </div>
             )}
-            
+
             {isOwner && (
-              <button 
-                className="profile-avatar-upload-btn" 
+              <button
+                className="profile-avatar-upload-btn"
                 onClick={() => avatarInputRef.current?.click()}
                 title="Change profile photo"
               >
@@ -434,213 +488,460 @@ export function ProfileScreen() {
         </div>
 
         {/* 3. Inline Navigation Tabs */}
-        <div className="profile-tabs-nav">
-          <button 
+        <div className="profile-tabs-nav" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            className={`profile-tab-link ${activeTab === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveTab('all')}
+          >
+            {t('profile.all')}
+          </button>
+          <button
             className={`profile-tab-link ${activeTab === 'about' ? 'active' : ''}`}
             onClick={() => setActiveTab('about')}
           >
             {t('profile.about')}
           </button>
+          <button
+            className={`profile-tab-link ${activeTab === 'reels' ? 'active' : ''}`}
+            onClick={() => setActiveTab('reels')}
+          >
+            {t('reels.reelsTitle')}
+          </button>
+          <button
+            className={`profile-tab-link ${activeTab === 'photos' ? 'active' : ''}`}
+            onClick={() => setActiveTab('photos')}
+          >
+            {t('profile.photos')}
+          </button>
           {!profile.is_redacted && (
-            <button 
+            <button
               className={`profile-tab-link ${activeTab === 'friends' ? 'active' : ''}`}
               onClick={() => setActiveTab('friends')}
             >
               {t('profile.friends')}
             </button>
           )}
-          <button 
-            className={`profile-tab-link ${activeTab === 'activity' ? 'active' : ''}`}
-            onClick={() => setActiveTab('activity')}
-          >
-            {t('profile.activity')}
-          </button>
-          <button 
-            className={`profile-tab-link ${activeTab === 'reels' ? 'active' : ''}`}
-            onClick={() => setActiveTab('reels')}
-          >
-            {t('reels.reelsTitle')}
-          </button>
+
+          {/* Xem thêm Dropdown Menu */}
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              className="profile-tab-link"
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              {t('profile.more')} <i className="fa-solid fa-chevron-down" style={{ fontSize: '10px' }}></i>
+            </button>
+
+            {showMoreMenu && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '8px',
+                background: 'var(--panel-bg)',
+                border: '1px solid var(--panel-border)',
+                borderRadius: '12px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                zIndex: 100,
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '6px',
+                minWidth: '180px',
+                animation: 'fadeIn 0.2s'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    showToast('Info', t('accountMenu.activityLog') || 'Activity Log', false);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '8px 12px',
+                    fontSize: '12.5px',
+                    color: 'var(--text-main)',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    borderRadius: '8px'
+                  }}
+                  className="post-action-btn"
+                >
+                  <i className="fa-solid fa-list-check" style={{ width: '14px', textAlign: 'center', color: 'var(--primary)' }} />
+                  {t('accountMenu.activityLog') || 'Activity Log'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    showToast('Info', 'Videos will be available in future releases', false);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '8px 12px',
+                    fontSize: '12.5px',
+                    color: 'var(--text-main)',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    borderRadius: '8px'
+                  }}
+                  className="post-action-btn"
+                >
+                  <i className="fa-solid fa-video" style={{ width: '14px', textAlign: 'center', color: 'var(--primary)' }} />
+                  Videos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    showToast('Info', t('accountMenu.managedPages') || 'Managed Pages', false);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '8px 12px',
+                    fontSize: '12.5px',
+                    color: 'var(--text-main)',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    borderRadius: '8px'
+                  }}
+                  className="post-action-btn"
+                >
+                  <i className="fa-solid fa-flag" style={{ width: '14px', textAlign: 'center', color: 'var(--primary)' }} />
+                  {t('accountMenu.managedPages') || 'Pages'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 4. Tab Display Panel */}
         <div className="profile-tab-panel">
           {activeTab === 'about' && (
-            <div className="tab-about-content">
-               <div className="about-info-grid">
-                 <div className="about-info-item">
-                   <div className="about-info-icon"><i className="fa-solid fa-circle-user"></i></div>
-                   <div className="about-info-value">
-                     <span className="info-title">{t('profile.fullName')}</span>
-                     <span className="info-desc">{profile.full_name || t('profile.notProvided')}</span>
-                   </div>
-                 </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+              
+              <AboutTabCard 
+                profile={profile} 
+                formattedDate={formattedDate} 
+                t={t} 
+                isOwner={currentUser?.id === profile.id}
+                onUpdateProfile={handleUpdateAboutInfo}
+                currentUser={currentUser}
+              />
 
-                 <div className="about-info-item">
-                   <div className="about-info-icon"><i className="fa-solid fa-envelope"></i></div>
-                   <div className="about-info-value">
-                     <span className="info-title">{t('profile.emailAddress')}</span>
-                     <span className="info-desc">{profile.email || t('profile.privateHidden')}</span>
-                   </div>
-                 </div>
+              {/* 2. Reels Card */}
+              <div className="profile-widget-card">
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <i className="fa-solid fa-clapperboard" style={{ color: 'var(--primary)' }} />
+                  {t('reels.reelsTitle')}
+                </h3>
+                <ReelsGrid reels={userReels} loading={reelsLoading} limit={12} emptyMessage={t('reels.noUserReels')} />
+              </div>
 
-                 <div className="about-info-item">
-                   <div className="about-info-icon"><i className="fa-solid fa-phone"></i></div>
-                   <div className="about-info-value">
-                     <span className="info-title">{t('profile.phoneNumber')}</span>
-                     <span className="info-desc">{profile.phone || t('profile.notProvided')}</span>
-                   </div>
-                 </div>
+              {/* 3. Ảnh (Photos Card) */}
+              <div className="profile-widget-card">
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <i className="fa-regular fa-image" style={{ color: 'var(--success)' }} />
+                  {t('profile.photos')}
+                </h3>
+                <PhotosGrid photos={allPhotos} loading={postsLoading} onPhotoClick={handlePhotoClick} limit={12} emptyMessage="Chưa có ảnh nào được chia sẻ." />
+              </div>
 
-                 <div className="about-info-item">
-                   <div className="about-info-icon"><i className="fa-solid fa-calendar-days"></i></div>
-                   <div className="about-info-value">
-                     <span className="info-title">{t('profile.joinedDate')}</span>
-                     <span className="info-desc">{formattedDate}</span>
-                   </div>
-                 </div>
+              {/* 4. Nhóm (Groups Card) */}
+              <div className="profile-widget-card">
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <i className="fa-solid fa-users-rectangle" style={{ color: '#EAB026' }} />
+                  Nhóm
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                  {[{ name: 'Cộng đồng lập trình Việt Nam', members: '142K thành viên', icon: '💻', gradient: 'linear-gradient(135deg, #1f4037, #99f2c8)' },
+                    { name: 'Connectly Designers Space', members: '24K thành viên', icon: '🎨', gradient: 'linear-gradient(135deg, #f857a6, #ff5858)' },
+                    { name: 'Vite & React Developers', members: '89K thành viên', icon: '⚡', gradient: 'linear-gradient(135deg, #00c6ff, #0072ff)' }
+                  ].map((group, idx) => (
+                    <div 
+                      key={idx}
+                      onClick={() => showToast('Group Info', `Truy cập nhóm: ${group.name}`, false)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px',
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid var(--panel-border)',
+                        borderRadius: '16px',
+                        padding: '14px 16px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="friend-grid-card"
+                    >
+                      <div style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '12px',
+                        background: group.gradient,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '20px'
+                      }}>
+                        {group.icon}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-main)' }}>{group.name}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{group.members}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-                 <div className="about-info-item">
-                   <div className="about-info-icon"><i className="fa-solid fa-earth-americas"></i></div>
-                   <div className="about-info-value">
-                     <span className="info-title">{t('profile.privacyLevel')}</span>
-                     <span className="info-desc">
-                       {profile.privacy_is_public ? t('profile.publicProfile') : t('profile.privateFriendsOnly')}
-                     </span>
-                   </div>
-                 </div>
-               </div>
+              {/* 5. Bạn bè (Friends Card) */}
+              {!profile.is_redacted && (
+                <div className="profile-widget-card">
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <i className="fa-solid fa-user-group" style={{ color: '#38ef7d' }} />
+                    {t('profile.friends')}
+                  </h3>
+                  <FriendsGrid friends={friends} loading={friendsLoading} showMutualLabel={true} />
+                </div>
+              )}
+
             </div>
           )}
 
           {activeTab === 'friends' && (
             <div className="tab-friends-content">
-              {friendsLoading ? (
-                <div className="tab-panel-loader">
-                  <i className="fa-solid fa-spinner fa-spin"></i> {t('profile.loadingFriends')}
-                </div>
-              ) : friends.length === 0 ? (
-                <div className="tab-panel-empty">{t('profile.noFriendsShow')}</div>
-              ) : (
-                <div className="friends-grid-list">
-                  {friends.map((friend) => (
-                    <div 
-                      key={friend.id} 
-                      className="friend-grid-card"
-                      onClick={() => navigate(`/profile/${friend.id}`)}
-                    >
-                      {friend.avatar_url ? (
-                        <img src={friend.avatar_url} alt={friend.username} className="friend-card-avatar" />
-                      ) : (
-                        <div className="friend-card-avatar-placeholder">
-                          {friend.username.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="friend-card-info">
-                        <div className="friend-card-name">{friend.full_name || friend.username}</div>
-                        <div className="friend-card-sub style-muted">
-                          {friend.is_mutual ? t('profile.mutualFriend') : `@${friend.username}`}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <FriendsGrid friends={friends} loading={friendsLoading} emptyMessage={t('profile.noFriendsShow')} />
             </div>
           )}
 
-          {activeTab === 'activity' && (
-            <div className="tab-activity-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {postsLoading ? (
-                <div className="tab-panel-loader">
-                  <i className="fa-solid fa-spinner fa-spin"></i> {t('profile.loadingPosts')}
-                </div>
-              ) : userPosts.length === 0 ? (
-                <div className="activity-timeline">
-                  <div className="activity-item">
-                    <div className="activity-dot"></div>
-                    <div className="activity-details">
-                      <span className="activity-title">{t('profile.accountCreated')}</span>
-                      <span className="activity-time">{formattedDate}</span>
+          {activeTab === 'all' && (
+            <div className="profile-all-tab-layout">
+              {/* Left Column (Sidebar Widgets) */}
+              <div className="profile-left-column">
+
+                {/* 1. Thông tin cá nhân (Intro Card) */}
+                <div className="profile-widget-card">
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '12px' }}>
+                    {t('profile.introTitle')}
+                  </h3>
+                  {profile.bio && (
+                    <p style={{ fontSize: '13px', color: 'var(--text-main)', textAlign: 'center', padding: '10px 0', borderBottom: '1px solid var(--panel-border)', marginBottom: '12px', fontStyle: 'italic', lineHeight: '1.4' }}>
+                      "{profile.bio}"
+                    </p>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                      <i className="fa-solid fa-circle-user" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                      <span>{t('profile.fullName')}: <strong style={{ color: 'var(--text-main)' }}>{profile.full_name || t('profile.notProvided')}</strong></span>
+                    </div>
+
+                    {(profile.privacy_settings?.['category'] !== 'private' && profile.privacy_settings?.['category'] !== 'friends') && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <i className="fa-solid fa-tags" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                        <span>Hạng mục: <strong style={{ color: 'var(--text-main)' }}>{profile.category || 'Người sáng tạo nội dung số (Digital Creator)'}</strong></span>
+                      </div>
+                    )}
+
+                    {(profile.privacy_settings?.['personal_info.location'] !== 'private' && profile.privacy_settings?.['personal_info.location'] !== 'friends') && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <i className="fa-solid fa-location-dot" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                        <span>Sống tại: <strong style={{ color: 'var(--text-main)' }}>{profile.location || 'Quận 1, Thành phố Hồ Chí Minh, Việt Nam'}</strong></span>
+                      </div>
+                    )}
+
+                    {(profile.privacy_settings?.['personal_info.hometown'] !== 'private' && profile.privacy_settings?.['personal_info.hometown'] !== 'friends') && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <i className="fa-solid fa-house" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                        <span>Đến từ: <strong style={{ color: 'var(--text-main)' }}>{profile.hometown || 'Hà Nội, Việt Nam'}</strong></span>
+                      </div>
+                    )}
+
+                    {(profile.privacy_settings?.['personal_info.birthday'] !== 'private' && profile.privacy_settings?.['personal_info.birthday'] !== 'friends') && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <i className="fa-solid fa-cake-candles" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                        <span>Sinh nhật: <strong style={{ color: 'var(--text-main)' }}>{renderBirthdayDisplay(profile.birthday)}</strong></span>
+                      </div>
+                    )}
+
+                    {(profile.privacy_settings?.['personal_info.relationship_status'] !== 'private' && profile.privacy_settings?.['personal_info.relationship_status'] !== 'friends') && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <i className="fa-solid fa-heart" style={{ width: '16px', color: '#EF4444' }}></i>
+                        <span>Mối quan hệ: <strong style={{ color: 'var(--text-main)' }}>{profile.relationship_status || 'Độc thân'}</strong></span>
+                      </div>
+                    )}
+
+                    {/* Jobs (Public only) */}
+                    {(profile.work || [
+                      { company: 'S-TECH Corp', position: 'Kỹ sư Web Developer', description: 'Xây dựng hệ thống chat trực tuyến thời gian thực và quản lý nhân sự.', duration: '2024 - Hiện tại', privacy_level: 'public' },
+                      { company: 'FPT Software', position: 'Fullstack Developer', description: 'Thiết kế API backend và triển khai cơ sở dữ liệu Postgres.', duration: '2021 - 2023', privacy_level: 'public' }
+                    ]).filter((job: any) => (job.privacy_level || 'public') === 'public').map((job: any, idx: number) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <i className="fa-solid fa-briefcase" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                        <span>Làm <strong style={{ color: 'var(--text-main)' }}>{job.position}</strong> tại <strong style={{ color: 'var(--text-main)' }}>{job.company}</strong></span>
+                      </div>
+                    ))}
+
+                    {/* Education (Public only) */}
+                    {(profile.education || [
+                      { school_name: 'Đại học Bách Khoa Hà Nội', degree: 'Đại học', description: 'Kỹ sư CNTT, 2017 - 2021', privacy_level: 'public' },
+                      { school_name: 'THPT Chuyên Hà Nội - Amsterdam', degree: 'Trường trung học phổ thông', description: 'Lớp chuyên Toán, 2014 - 2017', privacy_level: 'public' },
+                      { school_name: 'THCS Trưng Vương', degree: 'Trường trung học', description: 'Hà Nội, 2010 - 2014', privacy_level: 'public' }
+                    ]).filter((edu: any) => (edu.privacy_level || 'public') === 'public').map((edu: any, idx: number) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <i className="fa-solid fa-graduation-cap" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                        <span>Học <strong style={{ color: 'var(--text-main)' }}>{edu.degree}</strong> tại <strong style={{ color: 'var(--text-main)' }}>{edu.school_name}</strong></span>
+                      </div>
+                    ))}
+
+                    {(profile.privacy_settings?.['phone'] !== 'private' && profile.privacy_settings?.['phone'] !== 'friends') && profile.phone && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <i className="fa-solid fa-phone" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                        <span>Số điện thoại: <strong style={{ color: 'var(--text-main)' }}>{profile.phone}</strong></span>
+                      </div>
+                    )}
+
+                    {(profile.privacy_settings?.['email'] !== 'private' && profile.privacy_settings?.['email'] !== 'friends') && profile.email && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <i className="fa-solid fa-envelope" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Email: <strong style={{ color: 'var(--text-main)' }}>{profile.email}</strong></span>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                      <i className="fa-solid fa-calendar-days" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                      <span>{t('profile.joinedDate')}: <strong style={{ color: 'var(--text-main)' }}>{formattedDate}</strong></span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                      <i className="fa-solid fa-earth-americas" style={{ width: '16px', color: 'var(--primary)' }}></i>
+                      <span>{profile.privacy_is_public ? t('profile.publicProfile') : t('profile.privateFriendsOnly')}</span>
                     </div>
                   </div>
-                  {!profile.is_redacted && (
-                    <div className="activity-item">
-                      <div className="activity-dot active"></div>
-                      <div className="activity-details">
-                        <span className="activity-title">{t('profile.activeConnectionStatus')}</span>
-                        <span className="activity-time">
-                          {profile.friendshipStatus === 'self' ? 'Fully authenticated' : `Status: ${profile.friendshipStatus}`}
-                        </span>
+                </div>
+
+                {/* 4. Tin nổi bật (Highlights Carousel) */}
+                <div className="profile-widget-card" style={{ marginTop: '16px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <i className="fa-solid fa-star" style={{ color: '#F59E0B' }}></i>
+                    {t('profile.highlightsTitle')}
+                  </h3>
+                  <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '8px' }} className="stories-scroll-container">
+                    {[{ title: 'Kỷ niệm', icon: '🎬', gradient: 'linear-gradient(135deg, #FF512F, #DD2476)' },
+                    { title: 'Du lịch', icon: '✈️', gradient: 'linear-gradient(135deg, #180B20, #3E105C)' },
+                    { title: 'Ẩm thực', icon: '🍜', gradient: 'linear-gradient(135deg, #11998e, #38ef7d)' },
+                    { title: 'Bạn bè', icon: '❤️', gradient: 'linear-gradient(135deg, #FF8008, #FFC837)' },
+                    { title: 'Chill', icon: '🎵', gradient: 'linear-gradient(135deg, #00c6ff, #0072ff)' }
+                    ].map((item, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => showToast('Highlights Info', `Mở tin nổi bật: ${item.title}`, false)}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', flexShrink: 0 }}
+                      >
+                        <div style={{
+                          width: '60px',
+                          height: '60px',
+                          borderRadius: '50%',
+                          background: item.gradient,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '22px',
+                          border: '3px solid var(--panel-border)',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
+                        }} className="highlight-circle">
+                          {item.icon}
+                        </div>
+                        <span style={{ fontSize: '11.5px', fontWeight: 650, color: 'var(--text-main)' }}>{item.title}</span>
                       </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Ảnh Widget */}
+                <div className="profile-widget-card" style={{ marginTop: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)' }}>
+                      {t('profile.photos')} <span style={{ fontSize: '13.5px', fontWeight: 500, color: 'var(--text-muted)' }}>({allPhotos.length})</span>
+                    </h3>
+                    <button onClick={() => setActiveTab('photos')} style={{ fontSize: '12.5px', color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>
+                      {t('profile.viewAll')}
+                    </button>
+                  </div>
+                  <PhotosGrid photos={allPhotos} loading={postsLoading} onPhotoClick={handlePhotoClick} limit={9} gridTemplateColumns="repeat(3, 1fr)" emptyMessage="Chưa có ảnh nào để hiển thị." />
+                </div>
+
+                {/* 3. Bạn bè Widget */}
+                {!profile.is_redacted && (
+                  <div className="profile-widget-card" style={{ marginTop: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)' }}>
+                        {t('profile.friends')} <span style={{ fontSize: '13.5px', fontWeight: 500, color: 'var(--text-muted)' }}>({friends.length})</span>
+                      </h3>
+                      <button onClick={() => setActiveTab('friends')} style={{ fontSize: '12.5px', color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>
+                        {t('profile.viewAll')}
+                      </button>
                     </div>
+                    <FriendsGrid friends={friends} loading={friendsLoading} limit={9} gridTemplateColumns="repeat(3, 1fr)" emptyMessage="Chưa có bạn bè để hiển thị." />
+                  </div>
+                )}
+
+              </div>
+
+              {/* Right Column (Timeline Feed, Create Post) */}
+              <div className="profile-right-column">
+
+                {/* 5. Bài viết mới (Create Post Box - only for Owner) */}
+                {isOwner && <CreatePostBox />}
+
+                {/* 6. Bài viết (Timeline feed list) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="profile-widget-card" style={{ padding: '12px 16px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
+                      {t('profile.postsTitle')}
+                    </h3>
+                  </div>
+
+                  {postsLoading ? (
+                    <div className="tab-panel-loader">
+                      <i className="fa-solid fa-spinner fa-spin"></i> {t('profile.loadingPosts')}
+                    </div>
+                  ) : userPosts.length === 0 ? (
+                    <div className="profile-widget-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      Chưa có bài viết nào để hiển thị.
+                    </div>
+                  ) : (
+                    userPosts.map((post) => (
+                      <PostCard key={post.id} post={post} onPostDeleted={loadUserPostsList} />
+                    ))
                   )}
                 </div>
-              ) : (
-                <div style={{ maxWidth: '620px', margin: '0 auto', width: '100%' }}>
-                  {userPosts.map((post) => (
-                    <PostCard key={post.id} post={post} onPostDeleted={loadUserPostsList} />
-                  ))}
-                </div>
-              )}
+
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'photos' && (
+            <div className="tab-photos-content">
+              <PhotosGrid photos={allPhotos} loading={postsLoading} onPhotoClick={handlePhotoClick} emptyMessage="Chưa có ảnh nào được chia sẻ." />
             </div>
           )}
 
           {activeTab === 'reels' && (
             <div className="tab-activity-content">
-              {reelsLoading ? (
-                <div className="tab-panel-loader">
-                  <i className="fa-solid fa-spinner fa-spin"></i> {t('story.loadingStories') || 'Loading reels...'}
-                </div>
-              ) : userReels.length === 0 ? (
-                <div className="tab-panel-empty" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
-                  <i className="fa-solid fa-clapperboard" style={{ fontSize: '32px', marginBottom: '12px', display: 'block', opacity: 0.5 }}></i>
-                  {t('reels.noUserReels')}
-                </div>
-              ) : (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-                  gap: '12px',
-                  width: '100%'
-                }}>
-                  {userReels.map((reel) => (
-                    <div
-                      key={reel.id}
-                      onClick={() => navigate(`/reels`)}
-                      style={{
-                        position: 'relative',
-                        aspectRatio: '9/16',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                        background: '#000',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-                      }}
-                    >
-                      <video
-                        src={reel.video_url}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '8px',
-                        left: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        color: 'white',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.8)'
-                      }}>
-                        <i className="fa-regular fa-heart"></i>
-                        <span>{reel.likes_count}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <ReelsGrid reels={userReels} loading={reelsLoading} emptyMessage={t('reels.noUserReels')} />
             </div>
           )}
         </div>
@@ -652,15 +953,15 @@ export function ProfileScreen() {
           <div className="modal-content profile-edit-form" onClick={(e) => e.stopPropagation()}>
             <h1>{t('profile.editProfileInfo')}</h1>
             <p>{t('profile.editProfileDesc')}</p>
-            
+
             <form onSubmit={handleEditSubmit} className="setup-options">
               <div className="form-group">
                 <label>{t('profile.fullDisplayName')}</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  value={formData.full_name} 
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} 
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.full_name}
+                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                   placeholder="e.g. Alice Cooper"
                   maxLength={100}
                 />
@@ -668,11 +969,11 @@ export function ProfileScreen() {
 
               <div className="form-group">
                 <label>{t('profile.phoneNumber')}</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  value={formData.phone} 
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="e.g. +1 555-0199"
                   maxLength={20}
                 />
@@ -680,10 +981,10 @@ export function ProfileScreen() {
 
               <div className="form-group">
                 <label>{t('profile.biography')}</label>
-                <textarea 
-                  className="form-input" 
-                  value={formData.bio} 
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })} 
+                <textarea
+                  className="form-input"
+                  value={formData.bio}
+                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                   placeholder="Tell others about yourself..."
                   rows={3}
                   maxLength={500}
@@ -692,10 +993,10 @@ export function ProfileScreen() {
               </div>
 
               <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   id="privacy_toggle"
-                  checked={formData.privacy_is_public} 
+                  checked={formData.privacy_is_public}
                   onChange={(e) => setFormData({ ...formData, privacy_is_public: e.target.checked })}
                   style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                 />

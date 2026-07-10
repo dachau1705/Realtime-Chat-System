@@ -3,6 +3,19 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import * as pageService from '../services/page.service';
 import { logger } from '@libs/common';
 
+function parseArray(val: any): string[] {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Ignore
+    }
+  }
+  return [];
+}
+
 export async function getCategories(req: AuthenticatedRequest, res: Response) {
   try {
     const categories = await pageService.getCategories();
@@ -189,7 +202,9 @@ export async function unfollow(req: AuthenticatedRequest, res: Response) {
 export async function createPost(req: AuthenticatedRequest, res: Response) {
   const pageId = req.params.id;
   const userId = req.user!.userId;
-  const { content, postType, mediaUrls } = req.body;
+  let { content, postType, mediaUrls } = req.body;
+
+  mediaUrls = parseArray(mediaUrls);
 
   try {
     const post = await pageService.createPost(pageId, userId, content, postType, mediaUrls);

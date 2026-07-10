@@ -67,7 +67,7 @@ export function StoryBar() {
       showToast(t('story.publishing') || 'Publishing', 'Creating story...', false);
       await createStoryMutation.mutateAsync(uploadRes.url);
       
-      showToast(t('friends.addFriend') || 'Success', t('story.uploadStorySuccess'), false);
+      showToast(t('common.success') || 'Success', t('story.uploadStorySuccess'), false);
     } catch (err: any) {
       showToast(t('friends.delete') || 'Error', err.message || t('story.postStoryError'), true);
     } finally {

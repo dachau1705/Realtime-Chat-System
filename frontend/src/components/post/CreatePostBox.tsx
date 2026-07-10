@@ -91,7 +91,7 @@ export function CreatePostBox() {
           setImageUrls([]);
           setSelectedFriendIds([]);
           setVisibility('public');
-          showToast(t('friends.addFriend') || 'Success', t('post.publishSuccess'), false);
+          showToast(t('common.success') || 'Success', t('post.publishSuccess'), false);
         },
         onError: (err: any) => {
           showToast(t('post.publishError'), err.message || 'Failed to create post', true);

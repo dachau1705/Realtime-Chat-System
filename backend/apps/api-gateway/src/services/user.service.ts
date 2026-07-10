@@ -48,8 +48,14 @@ export async function getProfile(targetUserId: string, currentUserId: string) {
   };
 }
 
-export async function updateProfile(id: string, fullName: string, phone: string, bio: string, privacyIsPublic: boolean) {
-  return await userRepo.updateUserProfile(id, fullName, phone, bio, privacyIsPublic);
+export async function updateProfile(id: string, fullName: string, phone: string, bio: string, privacyIsPublic: boolean, aboutInfo?: any) {
+  const result = await userRepo.updateUserProfile(id, fullName, phone, bio, privacyIsPublic, aboutInfo);
+  if (result.newFamilyRequests && result.newFamilyRequests.length > 0) {
+    for (const req of result.newFamilyRequests) {
+      await createNotification(req.relative_user_id, id, 'family_request', null, null);
+    }
+  }
+  return await userRepo.findUserById(id);
 }
 
 export async function uploadAvatar(userId: string, fileBuffer: Buffer) {
@@ -119,3 +125,20 @@ export async function getFollowStatus(currentUserId: string, targetUserId: strin
   const isFollower = await userRepo.getFollowRelation(targetUserId, currentUserId);
   return { is_following: isFollowing, is_follower: isFollower };
 }
+
+export async function searchLocations(q: string) {
+  return await userRepo.searchLocations(q);
+}
+
+export async function searchLanguages(q: string) {
+  return await userRepo.searchLanguages(q);
+}
+
+export async function acceptFamilyRequest(userId: string, requestId: string) {
+  const result = await userRepo.acceptFamilyRequest(userId, requestId);
+  if (result) {
+    await createNotification(result.initiatorId, userId, 'family_accept', null, null);
+  }
+  return result;
+}
+

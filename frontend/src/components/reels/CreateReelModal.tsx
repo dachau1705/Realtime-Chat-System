@@ -51,7 +51,7 @@ export function CreateReelModal({ onClose, onSuccess }: CreateReelModalProps) {
       // 2. Save Reel details in database
       await createReel(token, uploadRes.url, caption.trim() || null);
 
-      showToast(t('friends.addFriend') || 'Success', t('reels.publishSuccess'), false);
+      showToast(t('common.success') || 'Success', t('reels.publishSuccess'), false);
       onSuccess();
       onClose();
     } catch (err: any) {

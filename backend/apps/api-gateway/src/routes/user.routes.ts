@@ -14,4 +14,8 @@ router.post('/users/:id/follow', authenticateToken, userController.follow);
 router.post('/users/:id/unfollow', authenticateToken, userController.unfollow);
 router.get('/users/:id/follow-status', authenticateToken, userController.getFollowStatus);
 
+router.get('/locations/search', authenticateToken, userController.searchLocations);
+router.get('/languages/search', authenticateToken, userController.searchLanguages);
+router.post('/users/family/:id/accept', authenticateToken, userController.acceptFamilyRequest);
+
 export default router;

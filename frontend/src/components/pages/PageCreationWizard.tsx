@@ -46,15 +46,15 @@ export default function PageCreationWizard() {
     e.preventDefault();
     if (currentStep === 1) {
       if (!pageName.trim() || pageName.trim().length < 3) {
-        showToast(t('friends.addFriend') || 'Validation Error', 'Page name must be at least 3 characters.', true);
+        showToast(t('common.validationError') || 'Validation Error', 'Page name must be at least 3 characters.', true);
         return;
       }
       if (!username.trim() || username.trim().length < 3) {
-        showToast(t('friends.addFriend') || 'Validation Error', 'Username handle must be at least 3 characters.', true);
+        showToast(t('common.validationError') || 'Validation Error', 'Username handle must be at least 3 characters.', true);
         return;
       }
       if (!categoryId) {
-        showToast(t('friends.addFriend') || 'Validation Error', 'Please select a page category.', true);
+        showToast(t('common.validationError') || 'Validation Error', 'Please select a page category.', true);
         return;
       }
     }

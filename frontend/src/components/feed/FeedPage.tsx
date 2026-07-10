@@ -36,7 +36,7 @@ export function FeedPage() {
     setActionUserId(targetUserId);
     try {
       await followUser(token, targetUserId);
-      showToast(t('friends.addFriend') || 'Success', t('feed.followSuccess'), false);
+      showToast(t('common.success') || 'Success', t('feed.followSuccess'), false);
       
       // Remove followed user from local suggestions list
       setSuggestions((prev) => prev.filter((s) => s.id !== targetUserId));

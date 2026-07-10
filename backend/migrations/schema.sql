@@ -82,6 +82,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(1024) NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_url VARCHAR(1024) NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_is_public BOOLEAN DEFAULT TRUE NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS about_info JSONB DEFAULT '{}'::jsonb NOT NULL;
 
 -- 6. Follows table
 CREATE TABLE IF NOT EXISTS follows (
@@ -327,6 +328,161 @@ CREATE TABLE IF NOT EXISTS reel_comments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_reel_comments_reel ON reel_comments(reel_id, created_at ASC);
+
+-- 24. Relational Profile Tables
+-- Create User Profiles (One-to-One)
+CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    location VARCHAR(255) NULL,
+    hometown VARCHAR(255) NULL,
+    birthday VARCHAR(50) NULL,
+    relationship_status VARCHAR(50) NULL,
+    gender VARCHAR(20) NULL,
+    pronouns VARCHAR(50) NULL,
+    languages VARCHAR(255) NULL,
+    category VARCHAR(100) NULL,
+    pronunciation VARCHAR(255) NULL,
+    other_names VARCHAR(255) NULL,
+    copyright_statement TEXT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create User Work (One-to-Many)
+CREATE TABLE IF NOT EXISTS user_work (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    company VARCHAR(255) NOT NULL,
+    position VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    duration VARCHAR(100) NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create User Education (One-to-Many)
+CREATE TABLE IF NOT EXISTS user_education (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    school_name VARCHAR(255) NOT NULL,
+    degree VARCHAR(255) NOT NULL, -- 'Đại học', 'Trường trung học phổ thông', 'Trường trung học'
+    description TEXT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create User Hobbies (One-to-Many)
+CREATE TABLE IF NOT EXISTS user_hobbies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    hobby_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create User Places Visited (One-to-Many)
+CREATE TABLE IF NOT EXISTS user_places_visited (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    place_name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create User Favorite Groups (One-to-Many)
+CREATE TABLE IF NOT EXISTS user_favorite_groups (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    group_name VARCHAR(255) NOT NULL,
+    members_count VARCHAR(100) NULL,
+    icon VARCHAR(20) NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create User Social Links (One-to-Many)
+CREATE TABLE IF NOT EXISTS user_social_links (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    platform VARCHAR(50) NOT NULL, -- 'instagram', 'website', 'blog', 'github', 'linkedin'
+    url VARCHAR(1024) NOT NULL,
+    privacy_level VARCHAR(20) DEFAULT 'public',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create User Offers (One-to-Many)
+CREATE TABLE IF NOT EXISTS user_offers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    link VARCHAR(1024) NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add privacy_settings column to user_profiles table
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS privacy_settings JSONB DEFAULT '{}'::jsonb NOT NULL;
+
+-- Create locations table
+CREATE TABLE IF NOT EXISTS locations (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL
+);
+
+-- Prepopulate locations
+INSERT INTO locations (name) VALUES 
+('Quận 1, Thành phố Hồ Chí Minh, Việt Nam'),
+('Hà Nội, Việt Nam'),
+('Đà Nẵng, Việt Nam'),
+('Nha Trang, Việt Nam'),
+('Đà Lạt, Việt Nam'),
+('Cần Thơ, Việt Nam'),
+('Hải Phòng, Việt Nam'),
+('Vũng Tàu, Việt Nam'),
+('Huế, Việt Nam'),
+('Hạ Long, Việt Nam')
+ON CONFLICT (name) DO NOTHING;
+
+-- Create languages table
+CREATE TABLE IF NOT EXISTS languages (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL
+);
+
+INSERT INTO languages (name) VALUES 
+('Tiếng Việt'), ('Tiếng Anh (English)'), ('Tiếng Trung (Chinese)'), ('Tiếng Tây Ban Nha (Spanish)'), 
+('Tiếng Hindi'), ('Tiếng Ả Rập (Arabic)'), ('Tiếng Bengal (Bengali)'), ('Tiếng Bồ Đào Nha (Portuguese)'), 
+('Tiếng Nga (Russian)'), ('Tiếng Urdu'), ('Tiếng Indonesia'), ('Tiếng Đức (German)'), 
+('Tiếng Nhật (Japanese)'), ('Tiếng Pháp (French)'), ('Tiếng Thổ Nhĩ Kỳ (Turkish)'), ('Tiếng Ý (Italian)'), 
+('Tiếng Hàn (Korean)'), ('Tiếng Thái (Thai)'), ('Tiếng Lào (Lao)'), ('Tiếng Campuchia (Khmer)'), 
+('Tiếng Mã Lai (Malay)'), ('Tiếng Ba Lan (Polish)'), ('Tiếng Hà Lan (Dutch)'), ('Tiếng Thụy Điển (Swedish)'), 
+('Tiếng Na Uy (Norwegian)'), ('Tiếng Đan Mạch (Danish)'), ('Tiếng Phần Lan (Finnish)'), ('Tiếng Hy Lạp (Greek)'), 
+('Tiếng Rumani (Romanian)'), ('Tiếng Do Thái (Hebrew)'), ('Tiếng Hungary'), ('Tiếng Séc (Czech)'), 
+('Tiếng Slovak'), ('Tiếng Bulgari'), ('Tiếng Ukraina (Ukrainian)'), ('Tiếng Miến Điện (Burmese)'), 
+('Tiếng Mông Cổ'), ('Tiếng Ba Tư (Persian)'), ('Tiếng Latinh (Latin)'), ('Tiếng Phạn (Sanskrit)'), 
+('Tiếng Esperanto'), ('Tiếng Swahili'), ('Tiếng Zulu'), ('Tiếng Amharic'), 
+('Tiếng Yoruba'), ('Tiếng Igbo'), ('Tiếng Somali'), ('Tiếng Tagalog'), 
+('Tiếng Tamil'), ('Tiếng Telugu'), ('Tiếng Marathi'), ('Tiếng Gujarati'), 
+('Tiếng Kannada'), ('Tiếng Malayalam'), ('Tiếng Punjab (Punjabi)'), ('Tiếng Pashto'), 
+('Tiếng Kurd'), ('Tiếng Armenia'), ('Tiếng Gruzia'), ('Tiếng Azerbaijan'), 
+('Tiếng Kazakh'), ('Tiếng Uzbek'), ('Tiếng Kyrgyz'), ('Tiếng Tajik'), 
+('Tiếng Turkmen'), ('Tiếng Nepal'), ('Tiếng Sinhala'), ('Tiếng Dhivehi'), 
+('Tiếng Maori'), ('Tiếng Samoan'), ('Tiếng Tongan'), ('Tiếng Fiji'), 
+('Tiếng Hawaii'), ('Tiếng Gaelic Scotland'), ('Tiếng Wales (Welsh)'), ('Tiếng Ireland (Irish)'), 
+('Tiếng Basque'), ('Tiếng Catalan'), ('Tiếng Galicia'), ('Tiếng Yiddish'), 
+('Tiếng Iceland'), ('Tiếng Malta'), ('Tiếng Albania'), ('Tiếng Macedonia'), 
+('Tiếng Slovenia'), ('Tiếng Estonia'), ('Tiếng Latvia'), ('Tiếng Litva')
+ON CONFLICT (name) DO NOTHING;
+
+-- Create user_family table
+CREATE TABLE IF NOT EXISTS user_family (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    member_type VARCHAR(20) NOT NULL, -- 'member' or 'pet'
+    pet_name VARCHAR(255) NULL,
+    relative_user_id UUID REFERENCES users(id) ON DELETE CASCADE NULL,
+    relationship VARCHAR(50) NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending' NOT NULL, -- 'pending', 'accepted'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
 
 
 

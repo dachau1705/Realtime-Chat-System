@@ -378,8 +378,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         text = `${actorName} accepted your friend request.`;
       }
 
-      showToast('Notification', text);
-      showNativeNotification('New Notification', { body: text });
+      if (notif.type !== 'friend_accept') {
+        showToast('Notification', text);
+        showNativeNotification('New Notification', { body: text });
+      }
 
       setNotifications(prev => {
         const exists = prev.some(n => n.id === notif.id);

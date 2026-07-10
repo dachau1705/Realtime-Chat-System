@@ -1,4 +1,5 @@
 import { getData, postData, putData, deleteData } from '../lib/request';
+export { getData, postData, putData, deleteData };
 
 export interface User {
   id: string;
@@ -83,6 +84,26 @@ export interface UserProfile {
   bio: string | null;
   privacy_is_public: boolean;
   is_redacted?: boolean;
+  location?: string | null;
+  hometown?: string | null;
+  birthday?: string | null;
+  relationship_status?: string | null;
+  gender?: string | null;
+  pronouns?: string | null;
+  languages?: string | null;
+  category?: string | null;
+  pronunciation?: string | null;
+  other_names?: string | null;
+  copyright_statement?: string | null;
+  work?: Array<{ id?: string; company: string; position: string; description?: string | null; duration?: string | null }>;
+  education?: Array<{ id?: string; school_name: string; degree: string; description?: string | null }>;
+  hobbies?: string[];
+  places_visited?: string[];
+  favorite_groups?: Array<{ id?: string; group_name: string; members_count?: string | null; icon?: string | null }>;
+  social_links?: Array<{ id?: string; platform: string; url: string; privacy_level?: string }>;
+  offers?: Array<{ id?: string; title: string; description?: string | null; link?: string | null }>;
+  privacy_settings?: any;
+  family_members?: any[];
 }
 
 export interface UserFriend {
@@ -387,7 +408,7 @@ export async function fetchUserProfile(_token: string, userId: string): Promise<
 export async function updateUserProfile(
   _token: string,
   userId: string,
-  data: { full_name: string | null; phone: string | null; bio: string | null; privacy_is_public: boolean }
+  data: { full_name: string | null; phone: string | null; bio: string | null; privacy_is_public: boolean; about_info?: any }
 ): Promise<UserProfile> {
   const res = await putData(`/users/${userId}`, data);
   if (res.data && res.data.status === false) {
@@ -729,3 +750,19 @@ export async function deleteReel(_token: string, reelId: string): Promise<{ mess
   }
   return res.data;
 }
+
+export async function searchLocations(_token: string, q: string): Promise<Array<{ id: number; name: string }>> {
+  const res = await getData(`/locations/search`, { q }) as any;
+  return res.data || [];
+}
+
+export async function searchLanguages(_token: string, q: string): Promise<Array<{ id: number; name: string }>> {
+  const res = await getData(`/languages/search`, { q }) as any;
+  return res.data || [];
+}
+
+export async function acceptFamilyRequest(_token: string, requestId: string): Promise<{ success: boolean }> {
+  const res = await postData(`/users/family/${requestId}/accept`, {}) as any;
+  return res.data;
+}
+
